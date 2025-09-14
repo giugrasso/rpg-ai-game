@@ -14,11 +14,3 @@ echo "🟢 Done!"
 
 # Wait for Ollama process to finish.
 wait $pid
-
-curl --location 'http://localhost:11434/api/create' \
---header 'Content-Type: application/json' \
---data '{
-    "model": "rpg-game",
-    "from": "llama3.2",
-    "system": "You are a helpful assistant that helps create RPG games"
-}'

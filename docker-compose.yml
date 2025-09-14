@@ -49,7 +49,7 @@ services:
     restart: always
     volumes:
       - ./ia/ollama:/root/.ollama
-      - ./ia/ollama-entrypont.sh:/entrypoint.sh
+      - ./ia/ollama-entrypoint.sh:/entrypoint.sh
     ports:
       - "11434:11434"
     entrypoint: ["/usr/bin/bash", "/entrypoint.sh"]

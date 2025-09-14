@@ -24,7 +24,7 @@ L’IA agit comme maître du jeu, se souvient des actions précédentes et adapt
 ```bash
 git clone https://github.com/giugrasso/rpg-ai-game.git
 cd rpg-ai-game
-````
+```
 
 ### 2. Lancer la stack
 
@@ -68,12 +68,12 @@ Les contributions sont bienvenues !
 Pour contribuer :
 
 1. Forkez le projet.
-2. Créez une branche (`git checkout -b feature/ma-fonctionnalite`).
-3. Commitez vos changements (`git commit -m "Ajout: ma fonctionnalité"`).
-4. Poussez la branche (`git push origin feature/ma-fonctionnalite`).
+2. Créez une branche.
+3. Commitez vos changements.
+4. Poussez la branche.
 5. Ouvrez une Pull Request 🚀.
 
-Consultez le fichier `CONTRIBUTING.md` (à venir) pour plus de détails.
+Consultez le fichier [CONTRIBUTING](CONTRIBUTING) pour plus de détails.
 
 ---
 

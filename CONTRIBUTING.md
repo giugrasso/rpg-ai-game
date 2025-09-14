@@ -4,8 +4,8 @@
 Merci de votre intérêt ! 🚀
 
 ## Pré-requis
-- Python 3.11+
-- Poetry 2.0+
+- Python 3.13
+- Poetry 1.8.5
 - Node.js 20+
 - Docker et Docker Compose
 

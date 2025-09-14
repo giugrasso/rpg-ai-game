@@ -14,7 +14,7 @@ L’IA agit comme maître du jeu, se souvient des actions précédentes et adapt
 - 🔄 Sauvegarde et reprise de parties (PostgreSQL).
 - ⚡ Gestion des états temps réel et des tours (Redis).
 - 🌐 Interface web (React + Bootstrap).
-- 🐍 Backend (FastAPI + Poetry 1.8).
+- 🐍 Backend (FastAPI + Poetry).
 
 ---
 

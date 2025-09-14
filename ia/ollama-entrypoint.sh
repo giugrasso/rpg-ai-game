@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Encodez bien le fichier en LF et non en CRLF !
 # Start Ollama in the background.
 /bin/ollama serve &
 # Record Process ID.

@@ -1,23 +1,41 @@
-# Stage 0, "build-stage", based on Node.js, to build and compile the frontend
+# ==========================
+# Stage 0: Build frontend
+# ==========================
 FROM node:24 AS build-stage
 
 WORKDIR /app
 
-COPY package*.json /app/
+# Copier les fichiers de dépendances
+COPY package*.json ./
 
+# Installer les dépendances
 RUN npm install
 
-COPY ./ /app/
+# Copier tout le code source
+COPY ./ ./
 
-ARG VITE_API_URL=${VITE_API_URL}
+# Passer la variable VITE_API_URL au build
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
 
+# Build production (Vite)
 RUN npm run build
 
+# ==========================
+# Stage 1: Nginx production
+# ==========================
+FROM nginx:1-alpine
 
-# Stage 1, based on Nginx, to have only the compiled app, ready for production with Nginx
-FROM nginx:1
-
+# Copier le build React
 COPY --from=build-stage /app/dist/ /usr/share/nginx/html
 
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
-COPY ./nginx-backend-not-found.conf /etc/nginx/extra-conf.d/backend-not-found.conf
+# Copier la configuration Nginx
+COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx/nginx-default.conf /etc/nginx/conf.d/default.conf
+# COPY ./nginx/nginx-backend-not-found.conf /etc/nginx/conf.d/backend-not-found.conf
+
+# Exposer le port 3000
+EXPOSE 3000
+
+# Lancer Nginx en mode foreground
+CMD ["nginx", "-g", "daemon off;"]

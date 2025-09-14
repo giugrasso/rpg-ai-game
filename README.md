@@ -73,7 +73,7 @@ Pour contribuer :
 4. Poussez la branche.
 5. Ouvrez une Pull Request 🚀.
 
-Consultez le fichier [CONTRIBUTING](CONTRIBUTING) pour plus de détails.
+Consultez le fichier [CONTRIBUTING](CONTRIBUTING.md) pour plus de détails.
 
 ---
 

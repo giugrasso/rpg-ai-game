@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   db:
     image: postgres:16
@@ -33,6 +32,17 @@ services:
       - ollama
     ports:
       - "8000:8000"
+    develop:
+      watch:
+        # quand un fichier Python change → sync dans le conteneur
+        - path: ./backend
+          target: /app
+          action: sync
+        # si le pyproject.toml change → rebuild complet
+        - path: ./backend/pyproject.toml
+          action: rebuild
+        - path: ./backend/poetry.lock
+          action: rebuild
 
   frontend:
     build:
@@ -43,6 +53,17 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    develop:
+      watch:
+        # sync direct du code source frontend
+        - path: ./frontend
+          target: /app
+          action: sync
+        # si package.json change → rebuild complet
+        - path: ./frontend/package.json
+          action: rebuild
+        - path: ./frontend/package-lock.json
+          action: rebuild
 
   ollama:
     image: ollama/ollama:latest

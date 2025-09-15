@@ -32,6 +32,10 @@ cd rpg-ai-game
 docker-compose up --build
 ```
 
+```bash
+docker compose up --watch
+```
+
 ### 3. Accéder aux services
 
 * Frontend : [http://localhost:3000](http://localhost:3000)

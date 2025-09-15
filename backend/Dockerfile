@@ -1,11 +1,14 @@
 # Utilise Python 3.13 slim
 FROM python:3.13-slim
 
-# Variables d'environnement pour Python
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Variables d'environnement pour Python et Poetry
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/root/.local/bin:$PATH" \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
 
-# Installer les dépendances système
+# Installer dépendances système
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -14,7 +17,6 @@ RUN apt-get update && apt-get install -y \
 
 # Installer Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="/root/.local/bin:$PATH"
 
 # Copier fichiers de dépendances et installer
 WORKDIR /app

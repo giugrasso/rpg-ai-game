@@ -52,3 +52,31 @@ def add_player(player: Player):
 
     players_db.append(player)
     return player
+
+
+@app.get(
+    "/players/{player_id}",
+    response_model=Player,
+    status_code=200,
+    responses={
+        404: {
+            "description": "Player not found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "message": "Player not found.",
+                    }
+                }
+            },
+        }
+    },
+)
+def get_player(player_id: int):
+    """
+    Retourne un joueur par son ID.
+    """
+    player = next((p for p in players_db if p.id == player_id), None)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not found.")
+    return player

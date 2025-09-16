@@ -363,12 +363,12 @@ async def startup_event():
         roles={
             "Chasseur": CharacterRole(
                 name="Chasseur",
-                stats={"force": 18, "intel": 12, "charisma": 14},
+                stats={"force": 18, "intelligence": 12, "charisme": 14, "courage": 16, "chance": 10},
                 description="Utilise des armes à feu et des pièges",
             ),
             "Scientifique": CharacterRole(
                 name="Scientifique",
-                stats={"force": 10, "intel": 18, "charisma": 12},
+                stats={"force": 10, "intelligence": 18, "charisme": 12, "courage": 8, "chance": 14},
                 description="Expert en biologie et en technologie",
             ),
         },

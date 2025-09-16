@@ -22,8 +22,8 @@ CHARACTER=$(jq -n \
   --arg pid "$PLAYER_ID" \
   '{
     "player_id": $pid,
-    "display_name": "Obi-Wan",
-    "role": "Jedi",
+    "display_name": "James",
+    "role": "Chasseur",
     "stats": {"force": 18, "intel": 12, "charisma": 14},
     "hp": 100,
     "mp": 50
@@ -33,13 +33,13 @@ curl -s -X POST "${BASE_URL}/games/${GAME_ID}/join" \
   -H "Content-Type: application/json" \
   -d "$CHARACTER" | jq .
 
-echo "=== 4. Envoyer une action (attaque au sabre laser) ==="
+echo "=== 4. Envoyer une action (Tire un coup de feu pour signaler sa présence) ==="
 ACTION=$(jq -n \
   --arg pid "$PLAYER_ID" \
   '{
     "player_id": $pid,
-    "action": "Je frappe le Stormtrooper avec mon sabre laser.",
-    "meta": {"weapon": "lightsaber"}
+    "action": "Je tire un coup de feu pour signaler ma présence.",
+    "meta": {"weapon": "pistolet", "target": "zone ouverte"}
   }')
 
 curl -s -X POST "${BASE_URL}/games/${GAME_ID}/action" \

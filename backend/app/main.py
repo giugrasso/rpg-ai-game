@@ -356,26 +356,29 @@ async def game_history(game_id: str):
 async def startup_event():
     # create a demo StarWars-like scenario as illustration
     sc = Scenario(
-        name="Starfield Skirmish",
-        description="Sci-fi skirmish scenario (demo).",
+        name="L'ile des dinosaures",
+        description="Une ile mystérieuse peuplée de dinosaures issus d'une expérience scientifique.",
         mode=GameMode.PVE,
         max_players=4,
         roles={
-            "Jedi": CharacterRole(
-                name="Jedi",
+            "Chasseur": CharacterRole(
+                name="Chasseur",
                 stats={"force": 18, "intel": 12, "charisma": 14},
-                description="Lightsaber user",
+                description="Utilise des armes à feu et des pièges",
             ),
-            "Rebel": CharacterRole(
-                name="Rebel",
-                stats={"force": 10, "intel": 14, "charisma": 12},
-                description="Marksman",
+            "Scientifique": CharacterRole(
+                name="Scientifique",
+                stats={"force": 10, "intel": 18, "charisma": 12},
+                description="Expert en biologie et en technologie",
             ),
         },
         context=(
-            "You are on a frozen outpost. Rebels defend against Imperial raiders. "
-            "Rules: one main action per turn. Resolve using virtual d20 when appropriate. "
-            "Provide structured JSON outputs when requested."
+            "Vous êtes sur une ile tropicale où des expériences génétiques ont mal tourné, libérant des dinosaures. "
+            "Les joueurs doivent coopérer pour survivre, explorer l'ile, et trouver un moyen de s'échapper. "
+            "Les règles incluent des jets de dés pour les actions risquées, la gestion des ressources (nourriture, eau), "
+            "et des rencontres aléatoires avec des dinosaures hostiles. Les joueurs peuvent utiliser leurs compétences spéciales "
+            "en fonction de leur rôle. L'objectif est de retrouver un scientifique qui détient le secret de l'ile "
+            "et un moyen de s'échapper."
         ),
     )
     SCENARIOS[sc.id] = sc

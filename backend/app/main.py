@@ -377,8 +377,8 @@ async def startup_event():
             "Les joueurs doivent coopérer pour survivre, explorer l'ile, et trouver un moyen de s'échapper. "
             "Les règles incluent des jets de dés pour les actions risquées, la gestion des ressources (nourriture, eau), "
             "et des rencontres aléatoires avec des dinosaures hostiles. Les joueurs peuvent utiliser leurs compétences spéciales "
-            "en fonction de leur rôle. L'objectif est de retrouver un scientifique qui détient le secret de l'ile "
-            "et un moyen de s'échapper."
+            "en fonction de leur rôle. L'objectif est de se rendre dans le centre de l'ile pour trouver un scientifique "
+            "qui détient le secret de l'ile et un moyen de s'échapper."
         ),
     )
     SCENARIOS[sc.id] = sc

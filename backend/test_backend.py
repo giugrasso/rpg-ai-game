@@ -1,5 +1,5 @@
-from pprint import pprint
 import json
+from pprint import pprint
 
 import requests
 
@@ -38,8 +38,8 @@ def main():
     print("=== 4. Envoyer une action (Tire un coup de feu pour signaler sa présence) ===")
     action = {
         "player_id": player_id,
-        "action": "Je tire un coup de feu pour signaler ma présence.",
-        "meta": {"weapon": "fusil de chasse", "target": "zone ouverte"},
+        "action": "Je tire un coup de feu en l'air pour signaler ma présence.",
+        "meta": {"weapon": "fusil de chasse"},
     }
     response = requests.post(f"{BASE_URL}/games/{game_id}/action", json=action)
     pprint(response.json())

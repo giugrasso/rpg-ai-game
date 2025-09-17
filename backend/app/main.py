@@ -1,17 +1,20 @@
 # backend/app/main.py
-import asyncio
+import os
+from datetime import datetime
+from enum import Enum
 from typing import Dict, List, Optional
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from enum import Enum
-from datetime import datetime
 
 # Ollama async client
 from ollama import AsyncClient  # pip install ollama
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="RPG AI Game - Scenario-driven Backend (Async Ollama)")
+
+load_dotenv(".env")  # load env vars from .env file
 
 
 # ---------------------------
@@ -90,62 +93,9 @@ GAMES: Dict[str, Game] = {}
 # Ollama client (singleton)
 # ---------------------------
 # You can configure host via env vars if needed, e.g. AsyncClient(host="http://ollama:11434")
-ollama_client = AsyncClient(host="http://ollama:11434")  # default talks to localhost:11434
-
-
-# # ---------------------------
-# # Helper: build prompt for Ollama
-# # ---------------------------
-# def build_prompt_for_action(
-#     scenario: Scenario, game: Game, action_req: ActionRequest
-# ) -> str:
-#     """
-#     Compose a prompt that contains:
-#       - scenario.context (world description, rules)
-#       - concise current game state (turn, players with hp/stats)
-#       - short history (last N actions)
-#       - the player's current requested action
-#       - an instruction to return structured JSON (narration, delta_state, options)
-#     """
-#     # compact state
-#     players_state = []
-#     for p in game.players:
-#         players_state.append(
-#             f"{p.display_name} (id={p.id}, role={p.role}, hp={p.hp}, stats={p.stats}, pos={p.position})"
-#         )
-#     last_actions = game.history[-10:]  # last up to 10 actions
-#     last_actions_text = "\n".join(
-#         [f"- [{a['timestamp']}] {a['actor']}: {a['action']}" for a in last_actions]
-#     )
-
-#     prompt = f"""
-# You are the scenario Game Master. Use the provided Scenario context and the current game state to resolve the player's action.
-# Scenario: {scenario.name}
-# Context: {scenario.context}
-
-# Current Game State (turn {game.turn}):
-# Players:
-# {chr(10).join(players_state)}
-
-# Recent actions:
-# {last_actions_text if last_actions_text else '- none'}
-
-# Player action request:
-# Player id: {action_req.player_id}
-# Action: {action_req.action}
-# Meta: {action_req.meta}
-
-# INSTRUCTIONS (important):
-# - Resolve the action using the scenario rules.
-# - Provide a concise narration (1-3 sentences).
-# - Provide any dice rolls you simulated (type and value).
-# - Provide a delta_state array describing minimal changes to apply (e.g. [{{'actor':'char-id','hp':-5}}]).
-# - Provide two follow-up options players can choose with short descriptions.
-# - Return the response in valid JSON object ONLY, with keys: narration, rolls, delta_state, options.
-
-# Respond in JSON only.
-# """
-#     return prompt.strip()
+ollama_client = AsyncClient(
+    host="http://ollama:11434"
+)  # default talks to localhost:11434
 
 
 # ---------------------------
@@ -252,18 +202,21 @@ AI_OUTPUT_SCHEMA = {
 }
 
 
-
 # ------------------------------
 # Build prompt pour l'action
 # ------------------------------
-def build_prompt_for_action(scenario: Scenario, game: Game, action: ActionRequest) -> str:
+def build_prompt_for_action(
+    scenario: Scenario, game: Game, action: ActionRequest
+) -> str:
     prompt = f"Scenario: {scenario.name}\n"
     prompt += f"Description: {scenario.description}\n"
-    prompt += f"Players:\n"
+    prompt += "Players:\n"
     for p in game.players:
         prompt += f"- {p.display_name} ({p.role}) HP:{p.hp} MP:{p.mp} Stats:{p.stats}\n"
     prompt += f"\nAction by {action.player_id}: {action.action}\n"
-    prompt += "Respond in JSON format with fields: narration, delta_state, rolls, options."
+    prompt += (
+        "Respond in JSON format with fields: narration, delta_state, rolls, options."
+    )
     return prompt
 
 
@@ -292,7 +245,7 @@ async def game_action(game_id: str, action: ActionRequest):
 
     try:
         resp = await ollama_client.generate(
-            model="llama3.2:latest",
+            model=os.getenv("OLLAMA_MODEL", "LLAMA3.2"),
             prompt=prompt,
             stream=False,
             format=AI_OUTPUT_SCHEMA,
@@ -340,6 +293,7 @@ async def game_action(game_id: str, action: ActionRequest):
         delta_state=parsed.get("delta_state", []),
         options=parsed.get("options", []),
     )
+
 
 @app.get("/games/{game_id}/history", response_model=List[Dict])
 async def game_history(game_id: str):

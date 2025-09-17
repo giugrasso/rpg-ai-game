@@ -7,6 +7,20 @@ BASE_URL = "http://localhost:8000"
 
 def main():
   try:
+
+    print("=== Vérification de l'existence du modèle Ollama ===")
+    response = requests.get(f"{BASE_URL}/config/get_model")
+    pprint(response.json())
+    if response.status_code == 200 and response.json().get("model_exists"):
+      print("Le modèle existe déjà.")
+    else:
+      print("=== Creation du model Ollama ===")
+      response = requests.post(f"{BASE_URL}/config/set_model")
+      pprint(response.json())
+
+      response = requests.get(f"{BASE_URL}/config/get_model")
+      pprint(response.json())
+
     print("=== 1. Lister les scénarios disponibles ===")
     response = requests.get(f"{BASE_URL}/scenarios")
     scenarios = response.json()
@@ -38,7 +52,7 @@ def main():
     print("=== 4. Envoyer une action (Tire un coup de feu pour signaler sa présence) ===")
     action = {
         "player_id": player_id,
-        "action": "Je tire un coup de feu en l'air pour signaler ma présence.",
+        "action": "Où suis-je ? Je tire un coup de feu pour signaler ma présence.",
         "meta": {"weapon": "fusil de chasse"},
     }
     response = requests.post(f"{BASE_URL}/games/{game_id}/action", json=action)

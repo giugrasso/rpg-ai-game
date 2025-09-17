@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 from uuid import uuid4
 
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
@@ -245,7 +246,7 @@ async def game_action(game_id: str, action: ActionRequest):
 
     try:
         resp = await ollama_client.generate(
-            model=os.getenv("OLLAMA_MODEL", "LLAMA3.2"),
+            model=os.getenv("OLLAMA_MODEL", "game_master"),
             prompt=prompt,
             stream=False,
             format=AI_OUTPUT_SCHEMA,
@@ -303,6 +304,42 @@ async def game_history(game_id: str):
     return game.history
 
 
+@app.get("/config/get_model")
+async def get_ollama_model():
+    resp = requests.get("http://ollama:11434/api/tags")
+    resp.raise_for_status()
+    models = resp.json()
+    print(models)
+    for m in models["models"]:
+        print(m)
+        if m.get("name") == "game_master:latest":
+            return {"model_exists": True}
+    raise HTTPException(status_code=404, detail="Master model not found")
+
+
+@app.post("/config/set_model")
+async def set_ollama_model():
+    payload = {
+        "model": "game_master",
+        "from": "llama3.2",
+        "system": (
+            "Tu es un maître du jeu pour des parties de jeux de rôle. Tu fournis des descriptions immersives, gères les règles, et crées des scénarios captivants pour les joueurs. Adapte tes réponses en fonction du contexte et des actions des joueurs."
+        ),
+    }
+
+    # headers = {"Content-Type": "application/json"}
+
+    try:
+        resp = requests.request(
+            "POST", "http://ollama:11434/api/create", json=payload
+        )
+        resp.raise_for_status()
+    except Exception as exc:
+        return {"status": f"failed to create model: {exc}"}
+
+    return {"status": "model game_master created based on llama3.2"}
+
+
 # ---------------------------
 # Simple example to prefill a scenario
 # ---------------------------
@@ -327,12 +364,10 @@ async def startup_event():
             ),
         },
         context=(
-            "Vous êtes sur une ile tropicale où des expériences génétiques ont mal tourné, libérant des dinosaures. "
-            "Les joueurs doivent coopérer pour survivre, explorer l'ile, et trouver un moyen de s'échapper. "
-            "Les règles incluent des jets de dés pour les actions risquées, la gestion des ressources (nourriture, eau), "
-            "et des rencontres aléatoires avec des dinosaures hostiles. Les joueurs peuvent utiliser leurs compétences spéciales "
-            "en fonction de leur rôle. L'objectif est de se rendre dans le centre de l'ile pour trouver un scientifique "
-            "qui détient le secret de l'ile et un moyen de s'échapper."
+            "Les joueurs sont arrivé de nuit par le port sur une ile tropicale où des expériences génétiques ont mal tourné, libérant des dinosaures. "
+            "Les joueurs doivent coopérer pour survivre, explorer l'ile, et trouver un scientifique qui s'appelle George et se rendre à l'héliport "
+            "qui se trouve dans le centre de l'ile. Les règles incluent des jets de dés pour les actions risquées, la gestion des ressources (nourriture, eau), "
+            "et des rencontres aléatoires avec des dinosaures hostiles. Les joueurs peuvent utiliser leurs compétences spéciales en fonction de leur rôle."
         ),
     )
     SCENARIOS[sc.id] = sc

@@ -42,9 +42,9 @@ def main():
         "player_id": player_id,
         "display_name": "James",
         "role": "Chasseur",
-        "stats": {"force": 18, "intel": 12, "charisma": 14},
-        "hp": 100,
-        "mp": 50,
+        "stats": {"force": 18, "intel": 12, "charisma": 14, "chance": 10},
+        "hp": 100.0,
+        "mp": 50.0,
     }
     response = requests.post(f"{BASE_URL}/games/{game_id}/join", json=character)
     pprint(response.json())

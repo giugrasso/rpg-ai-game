@@ -17,6 +17,8 @@ app = FastAPI(title="RPG AI Game - Scenario-driven Backend (Async Ollama)")
 
 load_dotenv(".env")  # load env vars from .env file
 
+AI_MODEL = os.getenv("OLLAMA_MODEL", "LLAMA3.2")  # default model if not set in env
+
 
 # ---------------------------
 # Models
@@ -36,6 +38,7 @@ class Scenario(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     description: str
+    objectives: str
     mode: GameMode
     max_players: int
     roles: Dict[str, CharacterRole]  # role name -> role definition
@@ -48,8 +51,8 @@ class Character(BaseModel):
     display_name: str
     role: str
     stats: Dict[str, int]
-    hp: int
-    mp: Optional[int] = 0
+    hp: float
+    mp: float
     position: Optional[str] = "start"
 
 
@@ -77,11 +80,17 @@ class ActionRequest(BaseModel):
     )
 
 
+class Options(BaseModel):
+    id: int
+    description: str
+    success_rate: float  # estimated success rate (0.0 to 1.0)
+    health_point_change: float  # e.g. -10 for damage, +5 for healing
+    mana_point_change: float  # e.g. -5 for spell cost, +3 for regen
+
+
 class AIResponse(BaseModel):
     narration: str
-    rolls: Optional[List[Dict]] = None
-    delta_state: Optional[List[Dict]] = None
-    options: Optional[List[Dict]] = None
+    options: Optional[List[Options]]
 
 
 # ---------------------------
@@ -179,31 +188,6 @@ async def join_game(game_id: str, character: Character):
 
 
 # ------------------------------
-# JSON Schema pour réponses Ollama
-# ------------------------------
-AI_OUTPUT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "narration": {"type": "string"},
-        "delta_state": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "actor": {"type": "string"},
-                    "hp": {"type": "number"},
-                    "hp_set": {"type": "number"},
-                    "position": {"type": "string"},
-                },
-            },
-        },
-        "rolls": {"type": "array"},
-        "options": {"type": "array"},
-    },
-}
-
-
-# ------------------------------
 # Build prompt pour l'action
 # ------------------------------
 def build_prompt_for_action(
@@ -211,13 +195,15 @@ def build_prompt_for_action(
 ) -> str:
     prompt = f"Scenario: {scenario.name}\n"
     prompt += f"Description: {scenario.description}\n"
+    prompt += f"Context: {scenario.context}\n"
+    prompt += f"Objectives: {scenario.objectives}\n"
     prompt += "Players:\n"
     for p in game.players:
-        prompt += f"- {p.display_name} ({p.role}) HP:{p.hp} MP:{p.mp} Stats:{p.stats}\n"
+        prompt += f"- ID:{p.player_id} Nom:{p.display_name} ({p.role}) HP:{p.hp} MP:{p.mp} Stats:{p.stats}\n"
     prompt += f"\nAction by {action.player_id}: {action.action}\n"
-    prompt += (
-        "Respond in JSON format with fields: narration, delta_state, rolls, options."
-    )
+    # prompt += (
+    #     "Repond au format JSON en complétant tous les champs"
+    # )
     return prompt
 
 
@@ -239,6 +225,8 @@ async def game_action(game_id: str, action: ActionRequest):
 
     prompt = build_prompt_for_action(scenario, game, action)
 
+    print(f"=== Prompt sent to Ollama ===\n{prompt}\n")
+
     # ------------------------------
     # Appel Ollama Async avec format JSON
     # ------------------------------
@@ -246,10 +234,10 @@ async def game_action(game_id: str, action: ActionRequest):
 
     try:
         resp = await ollama_client.generate(
-            model=os.getenv("OLLAMA_MODEL", "game_master"),
+            model="game_master",
             prompt=prompt,
             stream=False,
-            format=AI_OUTPUT_SCHEMA,
+            format=AIResponse.model_json_schema(),
         )
 
         raw_response = getattr(resp, "response", None) or resp
@@ -290,8 +278,6 @@ async def game_action(game_id: str, action: ActionRequest):
 
     return AIResponse(
         narration=parsed.get("narration", ""),
-        rolls=parsed.get("rolls", []),
-        delta_state=parsed.get("delta_state", []),
         options=parsed.get("options", []),
     )
 
@@ -321,23 +307,45 @@ async def get_ollama_model():
 async def set_ollama_model():
     payload = {
         "model": "game_master",
-        "from": "llama3.2",
+        "from": AI_MODEL,
         "system": (
-            "Tu es un maître du jeu pour des parties de jeux de rôle. Tu fournis des descriptions immersives, gères les règles, et crées des scénarios captivants pour les joueurs. Adapte tes réponses en fonction du contexte et des actions des joueurs."
+            "Tu es un maître du jeu (MJ) expert en jeux de rôle. "
+            "Ton rôle est de créer une narration immersive et dynamique. "
+            "À chaque tour, tu dois :\n"
+            "1. Décrire l'environnement, les personnages, et les événements de manière vivante et sensorielle.\n"
+            "2. Adapter l'histoire au scénario choisi (ex: fantasy, science-fiction, horreur...), "
+            "en respectant l'objectif global défini pour la partie.\n"
+            "3. Prendre en compte les caractéristiques, compétences et équipement des joueurs, "
+            "ainsi que leurs décisions et les conséquences des choix précédents.\n"
+            "4. Proposer aux joueurs plusieurs options claires et déterminantes qui influencent la suite de l'aventure.\n"
+            "5. En cas de combat ou d'action risquée, intégrer des mécaniques de jet de dés (ex: d20) et "
+            "donner un retour chiffré ou narratif sur le résultat.\n"
+            "6. Si un joueur fournit une réponse absurde, incohérente ou hors contexte, "
+            "ne casse jamais l'immersion. "
+            "Interprète cela comme un signe qu'il a été empoisonné, hypnotisé, ensorcelé ou qu'il sombre dans la folie. "
+            "Propose des choix qui remettent subtilement le joueur sur la voie de l'objectif et fixe un success_rate à 0.0 si le joueur propose une action absurde ou hors contexte.\n\n"
+            "Tes réponses doivent être immersives, captivantes, et donner envie de continuer à jouer.\n"
+            "Ne révèle jamais le scénario à l'avance.\n"
+            "Laisse toujours aux joueurs l'opportunité de choisir leur chemin.\n"
+            "Réponds en français pour les options et la narration.\n"
+            "Le success_rate est une estimation de la probabilité de réussite d'une action allant de 0.0 à 1.0 (1.0 = succès certain, 0.0 = échec certain).\n"
+            "Le health_point_change est un multiplicateur de points de vie allant de -1.0 à 1.0 (négative pour les dégâts, positive pour la guérison) "
+            "(health_point_change à 1.0 restaure toute la vie. health_point_change à -1.0 retire toute la vie du joueur en le tuant.).\n"
+            "Le mana_point_change est un multiplicateur de points de mana (ou d'énergie) allant de -1.0 à 1.0 (négative pour le coût en mana, positive pour la régénération) "
+            "(mana_point_change à 1.0 restaure tout le mana (ou d'énergie). mana_point_change à -1.0 retire tout le mana (ou d'énergie) du joueur en l'empechant de prendre une autre action autre que se reposer ou prendre utiliser un objet qui restore du mana (ou d'énergie).).\n"
+            "Ne modifie pas les points de vie ou de mana en dehors des actions de combat."
         ),
     }
 
     # headers = {"Content-Type": "application/json"}
 
     try:
-        resp = requests.request(
-            "POST", "http://ollama:11434/api/create", json=payload
-        )
+        resp = requests.request("POST", "http://ollama:11434/api/create", json=payload)
         resp.raise_for_status()
     except Exception as exc:
         return {"status": f"failed to create model: {exc}"}
 
-    return {"status": "model game_master created based on llama3.2"}
+    return {"status": f"model game_master created based on {AI_MODEL}"}
 
 
 # ---------------------------
@@ -349,6 +357,7 @@ async def startup_event():
     sc = Scenario(
         name="L'ile des dinosaures",
         description="Une ile mystérieuse peuplée de dinosaures issus d'une expérience scientifique.",
+        objectives="Survivre, trouver le scientifique George, et atteindre l'héliport.",
         mode=GameMode.PVE,
         max_players=4,
         roles={

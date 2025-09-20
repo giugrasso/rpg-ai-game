@@ -1,42 +1,39 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Styles personnalisés */
+.narration-text {
+  white-space: pre-line;
+  font-size: 1.1rem;
+  line-height: 1.6;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.progress {
+  border-radius: 4px;
+  height: 20px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Style pour les boutons d'options */
+.btn-option {
+  text-align: left;
+  padding: 1rem;
+  border-width: 2px;
+  margin-bottom: 0.5rem;
+}
+
+.btn-option:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+/* Style pour les badges */
+.badge {
+  font-size: 0.9em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .narration-text {
+    font-size: 1rem;
   }
-  to {
-    transform: rotate(360deg);
+
+  .btn-option {
+    padding: 0.75rem;
   }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }

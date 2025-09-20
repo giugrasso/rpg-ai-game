@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 import requests
@@ -96,8 +96,7 @@ class Option(BaseModel):
 
 class AIResponse(BaseModel):
     narration: str
-    options: Optional[List[Option]] = []
-    delta_state: Optional[List[Dict[str, Any]]] = []
+    options: List[Option] = []
 
     @field_validator("options", mode="before")
     def validate_options(cls, v):
@@ -105,6 +104,9 @@ class AIResponse(BaseModel):
             return []
         return v
 
+class ChooseOptionRequest(BaseModel):
+    player_id: str
+    option_id: int
 
 # ---------------------------
 # In-memory "DB" (prototype)
@@ -234,27 +236,20 @@ async def game_action(game_id: str, action: ActionRequest):
     scenario = SCENARIOS.get(game.scenario_id)
     if not scenario:
         raise HTTPException(status_code=500, detail="Scenario not found")
-
     player = next((p for p in game.players if p.player_id == action.player_id), None)
     if not player:
         raise HTTPException(status_code=400, detail="Player not part of this game")
 
     prompt = build_prompt_for_action(scenario, game, action)
-
     logger.info(f"Prompt sent to Ollama:\n{prompt}")
-
-    # ------------------------------
-    # Appel Ollama Async avec format JSON
-    # ------------------------------
 
     try:
         resp = await ollama_client.generate(
             model="game_master",
             prompt=prompt,
             stream=False,
-            format=None,  # important pour gpt-oss
+            format=None,
         )
-
         raw_response = getattr(resp, "response", str(resp))
         logger.info(f"Raw AI response: {raw_response}")
 
@@ -268,32 +263,21 @@ async def game_action(game_id: str, action: ActionRequest):
                 detail=f"Invalid AI response format: {e}",
             )
 
-        # Apply delta_state to players
-        for change in parsed.delta_state or []:
-            actor_id = change.get("actor")
-            for p in game.players:
-                if p.player_id == actor_id:
-                    if "hp" in change and isinstance(change["hp"], (int, float)):
-                        p.hp = max(0, p.hp + change["hp"])
-                    if "hp_set" in change:
-                        p.hp = int(change["hp_set"])
-                    if "position" in change:
-                        p.position = change["position"]
-
-        # Append to history
+        # Appliquer les changements de HP/MP basés sur l'option choisie (simulation)
+        # Note : En pratique, vous appliquerez ces changements après que le joueur ait choisi une option.
+        # Ici, on stocke juste les options pour que le client puisse les afficher.
         game.history.append(
             {
                 "timestamp": datetime.utcnow().isoformat(),
                 "actor": action.player_id,
                 "action": action.action,
                 "ai_narration": parsed.narration,
+                "options": parsed.options,  # Stocke les options pour référence
             }
         )
         game.turn += 1
         game.last_updated = datetime.utcnow()
-
         return parsed
-
     except Exception as exc:
         logger.error(f"Ollama call failed: {exc}")
         raise HTTPException(
@@ -429,3 +413,34 @@ async def startup_event():
     )
     SCENARIOS[sc.id] = sc
     logger.info(f"Demo scenario created: {sc.id}")
+
+@app.post("/games/{game_id}/choose", response_model=Game)
+async def choose_option(game_id: str, req: ChooseOptionRequest):
+    game = GAMES.get(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    player = next((p for p in game.players if p.player_id == req.player_id), None)
+    if not player:
+        raise HTTPException(status_code=400, detail="Player not part of this game")
+
+    # Récupérer la dernière entrée de l'historique pour obtenir les options
+    if not game.history:
+        raise HTTPException(status_code=400, detail="No action history found")
+
+    last_action = game.history[-1]
+    chosen_option = next((opt for opt in last_action.get("options", []) if opt["id"] == req.option_id), None)
+    if not chosen_option:
+        raise HTTPException(status_code=400, detail="Option not found")
+
+    # Appliquer les multiplicateurs
+    if "health_point_change" in chosen_option:
+        player.hp = max(0, min(100, player.hp + chosen_option["health_point_change"] * 100))  # 100 = HP max
+    if "mana_point_change" in chosen_option:
+        player.mp = max(0, min(100, player.mp + chosen_option["mana_point_change"] * 100))  # 100 = MP max
+
+    # Mettre à jour l'historique avec le choix
+    last_action["chosen_option"] = req.option_id
+    game.last_updated = datetime.utcnow()
+
+    return game

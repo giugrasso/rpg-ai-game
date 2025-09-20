@@ -1,6 +1,8 @@
 # backend/app/main.py
 import logging
 import os
+import random
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
@@ -108,6 +110,12 @@ class AIResponse(BaseModel):
 class ChooseOptionRequest(BaseModel):
     player_id: str
     option_id: int
+
+
+class DiceRoll(BaseModel):
+    roll: int
+    success: bool
+    narration: str
 
 
 # ---------------------------
@@ -243,7 +251,7 @@ async def game_action(game_id: str, action: ActionRequest):
         raise HTTPException(status_code=400, detail="Player not part of this game")
 
     prompt = build_prompt_for_action(scenario, game, action)
-    logger.info(f"Prompt sent to Ollama:\n{prompt}")
+    logger.debug(f"Prompt sent to Ollama:\n{prompt}")
 
     try:
         resp = await ollama_client.generate(
@@ -253,36 +261,125 @@ async def game_action(game_id: str, action: ActionRequest):
             format=None,
         )
         raw_response = getattr(resp, "response", str(resp))
-        logger.info(f"Raw AI response: {raw_response}")
+        logger.debug(f"Raw AI response: {raw_response}")
 
-        # Parse and validate the AI response
+        # Nettoyage avancé de la réponse
         try:
-            parsed = AIResponse.model_validate_json(raw_response)
+            # Essayer de trouver un bloc JSON valide dans la réponse
+            json_match = re.search(r"\{.*\}", raw_response, re.DOTALL)
+            if not json_match:
+                # Si aucun JSON n'est trouvé, essayer de parser directement
+                try:
+                    parsed = AIResponse.model_validate_json(raw_response)
+                except:
+                    # Dernier recours: extraire manuellement les données
+                    logger.error(
+                        "Réponse AI invalide, tentative de récupération manuelle"
+                    )
+                    parsed = extract_ai_response_manually(raw_response)
+            else:
+                cleaned_json = json_match.group(0)
+                # Nettoyer les commentaires JSON si présents
+                cleaned_json = re.sub(r"//.*?\n", "", cleaned_json)
+                cleaned_json = re.sub(r"/\*.*?\*/", "", cleaned_json, flags=re.DOTALL)
+                parsed = AIResponse.model_validate_json(cleaned_json)
+
         except Exception as e:
-            logger.error(f"Failed to parse AI response: {e}")
+            logger.error(f"Échec du parsing: {e}")
+            logger.error(f"Réponse problématique: {raw_response}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Invalid AI response format: {e}",
+                detail=f"Format de réponse IA invalide: {str(e)[:200]}",
             )
 
-        # Stocker les options dans l'historique sous forme de liste de dictionnaires
+        # Stocker les options dans l'historique
         game.history.append(
             {
                 "timestamp": datetime.utcnow().isoformat(),
                 "actor": action.player_id,
                 "action": action.action,
                 "ai_narration": parsed.narration,
-                "options": [opt.model_dump() for opt in parsed.options],  # Conversion en dict
+                "options": [opt.model_dump() for opt in parsed.options],
             }
         )
         game.turn += 1
         game.last_updated = datetime.utcnow()
         return parsed
+
     except Exception as exc:
-        logger.error(f"Ollama call failed: {exc}")
+        logger.error(f"Appel à Ollama échoué: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ollama call failed: {exc}",
+            detail=f"Appel à Ollama échoué: {str(exc)[:200]}",
+        )
+
+
+# Ajoutez cette fonction pour extraire manuellement une réponse valide
+def extract_ai_response_manually(raw_response: str) -> AIResponse:
+    """Essaie d'extraire une réponse valide même si le format est incorrect"""
+    try:
+        # Essayer de trouver la narration
+        narration_match = re.search(
+            r'"narration"\s*:\s*"(.*?)"', raw_response, re.DOTALL
+        )
+        narration = (
+            narration_match.group(1)
+            if narration_match
+            else "Réponse narrative non disponible"
+        )
+
+        # Essayer de trouver les options
+        options = []
+        option_matches = re.finditer(
+            r'\{.*?"id"\s*:\s*(\d+).*?"description"\s*:\s*"(.*?)"',
+            raw_response,
+            re.DOTALL,
+        )
+
+        for match in option_matches:
+            try:
+                option_data = {
+                    "id": int(match.group(1)),
+                    "description": match.group(2),
+                    "success_rate": 0.5,  # Valeur par défaut
+                    "health_point_change": 0.0,  # Valeur par défaut
+                    "mana_point_change": 0.0,  # Valeur par défaut
+                    "related_stat": "intelligence",  # Valeur par défaut
+                }
+                options.append(option_data)
+            except Exception:
+                continue
+
+        # Si aucune option n'est trouvée, créer une option par défaut
+        if not options:
+            options = [
+                {
+                    "id": 1,
+                    "description": "Continuer l'exploration",
+                    "success_rate": 0.7,
+                    "health_point_change": 0.0,
+                    "mana_point_change": 0.0,
+                    "related_stat": "chance",
+                }
+            ]
+
+        return AIResponse(narration=narration, options=[Option(**opt) for opt in options])
+
+    except Exception as e:
+        logger.error(f"Échec de l'extraction manuelle: {e}")
+        # Retourner une réponse minimale valide
+        return AIResponse(
+            narration="L'IA a rencontré un problème technique. Veuillez réessayer.",
+            options=[
+                Option(
+                    id=1,
+                    description="Continuer malgré le problème technique",
+                    success_rate=0.5,
+                    health_point_change=0.0,
+                    mana_point_change=0.0,
+                    related_stat="chance",
+                )
+            ],
         )
 
 
@@ -352,6 +449,16 @@ Ton JSON doit **toujours** suivre ce schéma :
 - **Cohérence** :
     - Les effets (`health_point_change`, `mana_point_change`) doivent être **réalistes** dans le contexte (ex : une potion de soin ne restaure pas 100% des PV si le scénario est difficile).
     - Si une action est impossible (ex : "voler sans ailes"), fixe `success_rate=0.0` et propose des alternatives.
+
+---
+
+### Règles spéciales pour les échecs
+1. EN CAS D'ÉCHEC D'UNE ACTION :
+   - Décris uniquement la conséquence de l'échec dans la narration.
+   - NE METS PAS de schéma JSON ou d'explications sur le format.
+   - Respecte STRICTEMENT le format requis :
+{AIResponse.model_json_schema()}
+   - Les options doivent refléter les conséquences de l'échec (ex: 'Se soigner', 'Fuir', 'Tenter une autre approche')."
 
 ---
 ### Gestion des Cas Spéciaux
@@ -500,6 +607,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
     logger.info(f"Demo scenario created: {sc.id}")
 
 
+# Modifiez l'endpoint /games/{game_id}/choose comme suit
 @app.post("/games/{game_id}/choose", response_model=Game)
 async def choose_option(game_id: str, req: ChooseOptionRequest):
     game = GAMES.get(game_id)
@@ -514,25 +622,50 @@ async def choose_option(game_id: str, req: ChooseOptionRequest):
         raise HTTPException(status_code=400, detail="No action history found")
 
     last_action = game.history[-1]
-    if "options" not in last_action:
-        raise HTTPException(status_code=400, detail="No options in last action")
+    if "options" not in last_action or not last_action["options"]:
+        raise HTTPException(status_code=400, detail="No options available in history")
 
-    # Convertir option_id en entier
     option_id = int(req.option_id)
 
-    # Rechercher l'option choisie
-    chosen_option = None
-    for opt in last_action["options"]:
-        if int(opt["id"]) == option_id:
-            chosen_option = opt
-            break
-
+    # Trouver l'option choisie
+    chosen_option = next(
+        (opt for opt in last_action["options"] if int(opt["id"]) == option_id),
+        None,
+    )
     if not chosen_option:
         available_ids = [int(opt["id"]) for opt in last_action["options"]]
         raise HTTPException(
             status_code=400,
-            detail=f"Option {option_id} not found. Available IDs: {available_ids}"
+            detail=f"Option {option_id} not found. Available IDs: {available_ids}",
         )
+
+    # Calculer le succès de l'action
+    stat_value = player.stats.get(
+        chosen_option["related_stat"], 10
+    )  # Valeur par défaut si stat non trouvée
+    base_success_rate = chosen_option["success_rate"]
+    adjusted_success_rate = base_success_rate * (
+        stat_value / 10
+    )  # Normalisation sur une base de 10
+
+    # Lancer un dé si le taux de réussite ajusté est bas
+    dice_roll = None
+    if adjusted_success_rate < 0.5:  # Seuil pour lancer un dé
+        roll = random.randint(1, 20)
+        success = (
+            roll >= (1 - adjusted_success_rate) * 20
+        )  # Plus le taux est bas, plus il faut un bon jet
+        dice_roll = {
+            "roll": roll,
+            "success": success,
+            "narration": f"Jet de d20: {roll}/20. {'Réussi!' if success else 'Échec...'}",
+        }
+        if not success:
+            # En cas d'échec, appliquer une pénalité (ex: perte de PV)
+            if "health_point_change" in chosen_option:
+                chosen_option["health_point_change"] *= (
+                    2  # Double la pénalité en cas d'échec
+                )
 
     # Appliquer les multiplicateurs
     if "health_point_change" in chosen_option:
@@ -545,8 +678,27 @@ async def choose_option(game_id: str, req: ChooseOptionRequest):
         player.mp = max(0, min(100, player.mp + mp_change))
         logger.debug(f"MP updated: {player.mp} (change: {mp_change})")
 
-    # Mettre à jour l'historique
+    # Stocker le résultat du jet de dé dans l'historique
     last_action["chosen_option"] = option_id
+    last_action["dice_roll"] = dice_roll
+    last_action["adjusted_success_rate"] = adjusted_success_rate
+    last_action["stat_used"] = chosen_option["related_stat"]
+    last_action["stat_value"] = stat_value
+
     game.last_updated = datetime.utcnow()
 
     return game
+
+
+# Ajoutez un nouvel endpoint pour obtenir le résultat du dernier jet de dé
+@app.get("/games/{game_id}/last_roll", response_model=Optional[DiceRoll])
+async def get_last_roll(game_id: str):
+    game = GAMES.get(game_id)
+    if not game or not game.history:
+        return None
+
+    last_action = game.history[-1]
+    if "dice_roll" not in last_action:
+        return None
+
+    return last_action["dice_roll"]

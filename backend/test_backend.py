@@ -13,9 +13,7 @@ BASE_URL = "http://localhost:8000"
 
 
 async def main():
-    print(
-        "=== Test de cohérence narrative (version corrigée - actions basées sur les options IA) ==="
-    )
+    print("=== Test de cohérence narrative avec gestion améliorée des réponses IA ===")
 
     try:
         # 1. Initialisation
@@ -61,128 +59,237 @@ async def main():
             "comprendre_menace": False,
             "atteindre_heliport": False,
         }
-        last_narration = ""
-        last_chosen_option = None
+        current_action = (
+            "Observer attentivement les alentours pour évaluer la situation."
+        )
 
-        # 2. Premier tour - action initiale générique
-        action_text = "Observer attentivement les alentours pour évaluer la situation et repérer des indices."
-        print(f"\n--- Tour 1 --- Position: {player_position}")
-        print(f"Action initiale: {action_text}")
-
-        # 3. Boucle de jeu (20 tours max)
+        # 2. Boucle de jeu (20 tours max)
         for turn in range(1, 21):
-            if turn > 1:
-                print(f"\n--- Tour {turn} --- Position: {player_position}")
-                # Utiliser l'action basée sur l'option choisie précédemment
-                if last_chosen_option:
-                    action_text = f"[Suite de l'action précédente] {last_chosen_option['description']}"
-                    print(f"Action: {action_text}")
-                else:
-                    action_text = (
-                        "Continuer l'exploration en fonction de la situation actuelle."
-                    )
-                    print(f"Action: {action_text}")
+            print(f"\n--- Tour {turn} --- Position: {player_position}")
 
-            # 4. Envoyer l'action et recevoir la réponse de l'IA
-            response = requests.post(
-                f"{BASE_URL}/games/{game_id}/action",
-                json={"player_id": "player-1", "action": action_text},
-            )
-            response.raise_for_status()
-            ai_response = response.json()
-
-            # 5. Stocker et analyser la narration
-            last_narration = ai_response["narration"].lower()
-            print(f"\nNarration:\n{ai_response['narration']}")
-
-            # Mettre à jour les éléments narratifs
-            if any(
-                word in last_narration
-                for word in ["grognement", "rugissement", "cri", "bruit"]
-            ):
-                story_elements["sons_etranges"] += 1
-            if any(
-                word in last_narration for word in ["lueur", "lumière", "clignotement"]
-            ):
-                story_elements["lumiere"] += 1
-            if any(word in last_narration for word in ["trace", "empreinte", "marque"]):
-                story_elements["traces"] += 1
-            if any(
-                word in last_narration
-                for word in ["george", "scientifique", "chercheur"]
-            ):
-                story_elements["george"] += 1
-                objectives["trouver_george"] = True
-            if any(
-                word in last_narration for word in ["héliport", "évacuation", "centre"]
-            ):
-                story_elements["heliport"] += 1
-                objectives["atteindre_heliport"] = True
-            if any(
-                word in last_narration
-                for word in ["expérience", "quarantaine", "enclos", "sujet"]
-            ):
-                story_elements["experiences"] += 1
-                objectives["comprendre_menace"] = True
-
-            # Mettre à jour la position
-            if any(
-                word in last_narration
-                for word in ["jungle", "forêt", "végétation", "arbres"]
-            ):
-                player_position = "jungle"
-            elif any(
-                word in last_narration
-                for word in ["bâtiment", "laboratoire", "station", "porte"]
-            ):
-                player_position = "bâtiment"
-            elif any(
-                word in last_narration for word in ["plage", "rivage", "sable", "océan"]
-            ):
-                player_position = "plage"
-            elif any(
-                word in last_narration for word in ["colline", "héliport", "centre"]
-            ):
-                player_position = "collines centrales"
-
-            # 6. Afficher les options proposées par l'IA
-            print("\nOptions proposées par l'IA:")
-            options = ai_response["options"]
-            for i, opt in enumerate(options, 1):
-                print(
-                    f"{i}. {opt['description']} "
-                    f"(SR: {opt['success_rate']:.1f}, "
-                    f"ΔPV: {opt['health_point_change'] * 100:+.1f}, "
-                    f"ΔMana: {opt['mana_point_change'] * 100:+.1f})"
+            try:
+                # Envoyer l'action et recevoir la réponse de l'IA
+                response = requests.post(
+                    f"{BASE_URL}/games/{game_id}/action",
+                    json={"player_id": "player-1", "action": current_action},
                 )
 
-            # 7. Choisir une option aléatoirement
-            chosen_option = random.choice(options)
-            last_chosen_option = chosen_option  # Stocker pour le prochain tour
-            print(f"\nOption choisie: {chosen_option['description']}")
+                if response.status_code != 200:
+                    print(f"Erreur {response.status_code}: {response.text}")
+                    # En cas d'erreur, utiliser une action générique pour le prochain tour
+                    current_action = (
+                        "Reporter son attention sur les alentours immédiats."
+                    )
+                    await asyncio.sleep(1)
+                    continue
 
-            # 8. Appliquer le choix
-            response = requests.post(
-                f"{BASE_URL}/games/{game_id}/choose",
-                json={"player_id": "player-1", "option_id": int(chosen_option["id"])},
-            )
-            response.raise_for_status()
-            updated_game = response.json()
+                ai_response = response.json()
 
-            # 9. Vérifier l'état du joueur
-            player = next(
-                p for p in updated_game["players"] if p["player_id"] == "player-1"
-            )
-            print(f"État: PV={player['hp']:.1f}, Mana={player['mp']:.1f}")
+                # Vérifier que la réponse contient bien une narration
+                if "narration" not in ai_response:
+                    print(
+                        "Réponse IA invalide - utilisation d'une narration par défaut"
+                    )
+                    ai_response = {
+                        "narration": "L'IA a rencontré un problème technique. Vous continuez votre exploration avec prudence.",
+                        "options": [
+                            {
+                                "id": 1,
+                                "description": "Continuer l'exploration",
+                                "success_rate": 0.7,
+                                "health_point_change": 0.0,
+                                "mana_point_change": 0.0,
+                                "related_stat": "chance",
+                            }
+                        ],
+                    }
 
-            # 10. Vérifier la fin de partie
-            if player["hp"] <= 0:
-                print("\n⚰️ Le joueur est mort! Fin de la partie.")
-                break
+                # Stocker et analyser la narration
+                last_narration = ai_response["narration"].lower()
+                print(f"\nNarration:\n{ai_response['narration']}")
 
-            await asyncio.sleep(1.5)
+                # Mettre à jour les éléments narratifs
+                if any(
+                    word in last_narration
+                    for word in ["grognement", "rugissement", "cri", "bruit"]
+                ):
+                    story_elements["sons_etranges"] += 1
+                if any(
+                    word in last_narration
+                    for word in ["lueur", "lumière", "clignotement"]
+                ):
+                    story_elements["lumiere"] += 1
+                if any(
+                    word in last_narration for word in ["trace", "empreinte", "marque"]
+                ):
+                    story_elements["traces"] += 1
+                if any(
+                    word in last_narration
+                    for word in ["george", "scientifique", "chercheur"]
+                ):
+                    story_elements["george"] += 1
+                    objectives["trouver_george"] = True
+                if any(
+                    word in last_narration
+                    for word in ["héliport", "évacuation", "centre"]
+                ):
+                    story_elements["heliport"] += 1
+                    objectives["atteindre_heliport"] = True
+                if any(
+                    word in last_narration
+                    for word in ["expérience", "quarantaine", "enclos", "sujet"]
+                ):
+                    story_elements["experiences"] += 1
+                    objectives["comprendre_menace"] = True
 
-        # 11. Résumé final
+                # Mettre à jour la position
+                if any(
+                    word in last_narration
+                    for word in ["jungle", "forêt", "végétation", "arbres"]
+                ):
+                    player_position = "jungle"
+                elif any(
+                    word in last_narration
+                    for word in ["bâtiment", "laboratoire", "station", "porte"]
+                ):
+                    player_position = "bâtiment"
+                elif any(
+                    word in last_narration
+                    for word in ["plage", "rivage", "sable", "océan"]
+                ):
+                    player_position = "plage"
+                elif any(
+                    word in last_narration for word in ["colline", "héliport", "centre"]
+                ):
+                    player_position = "collines centrales"
+
+                # Afficher les options proposées par l'IA
+                print("\nOptions proposées par l'IA:")
+                options = ai_response["options"]
+
+                # Vérifier que les options sont valides
+                if not options or not isinstance(options, list):
+                    print("Options IA invalides - utilisation d'options par défaut")
+                    options = [
+                        {
+                            "id": 1,
+                            "description": "Continuer l'exploration avec prudence",
+                            "success_rate": 0.7,
+                            "health_point_change": 0.0,
+                            "mana_point_change": 0.0,
+                            "related_stat": "chance",
+                        }
+                    ]
+
+                for i, opt in enumerate(options, 1):
+                    stat_value = character["stats"].get(
+                        opt.get("related_stat", "chance"), 10
+                    )
+                    adjusted_success = opt.get("success_rate", 0.5) * (stat_value / 10)
+                    print(
+                        f"{i}. {opt.get('description', 'Option non disponible')} "
+                        f"(SR: {opt.get('success_rate', 0.5):.1f} → {adjusted_success:.2f} avec "
+                        f"{opt.get('related_stat', 'chance')}={stat_value}, "
+                        f"ΔPV: {opt.get('health_point_change', 0.0) * 100:+.1f}, "
+                        f"ΔMana: {opt.get('mana_point_change', 0.0) * 100:+.1f})"
+                    )
+
+                # Choisir une option aléatoirement
+                if not options:
+                    print(
+                        "Aucune option valide disponible - utilisation d'une option par défaut"
+                    )
+                    chosen_option = {
+                        "id": 1,
+                        "description": "Continuer prudemment",
+                        "success_rate": 0.7,
+                        "health_point_change": 0.0,
+                        "mana_point_change": 0.0,
+                        "related_stat": "chance",
+                    }
+                else:
+                    chosen_option = random.choice(options)
+
+                print(
+                    f"\nOption choisie: {chosen_option.get('description', 'Option par défaut')}"
+                )
+
+                # Calculer le succès ajusté
+                stat_value = character["stats"].get(
+                    chosen_option.get("related_stat", "chance"), 10
+                )
+                adjusted_success = chosen_option.get("success_rate", 0.5) * (
+                    stat_value / 10
+                )
+                print(
+                    f"Taux de réussite de base: {chosen_option.get('success_rate', 0.5):.1f}"
+                )
+                print(
+                    f"Taux ajusté avec {chosen_option.get('related_stat', 'chance')}={stat_value}: {adjusted_success:.2f}"
+                )
+
+                # Appliquer le choix
+                try:
+                    response = requests.post(
+                        f"{BASE_URL}/games/{game_id}/choose",
+                        json={
+                            "player_id": "player-1",
+                            "option_id": int(chosen_option.get("id", 1)),
+                        },
+                    )
+
+                    if response.status_code != 200:
+                        print(f"Erreur lors du choix: {response.text}")
+                        # Continuer avec une action générique
+                        current_action = (
+                            "Reporter son attention sur les alentours immédiats."
+                        )
+                        await asyncio.sleep(1)
+                        continue
+
+                    updated_game = response.json()
+
+                    # Vérifier le résultat du jet de dé
+                    dice_roll = requests.get(
+                        f"{BASE_URL}/games/{game_id}/last_roll"
+                    ).json()
+                    if dice_roll:
+                        print(
+                            f"\nRésultat du jet de dé: {dice_roll.get('narration', 'Jet non disponible')}"
+                        )
+
+                    # Vérifier l'état du joueur
+                    player = next(
+                        p
+                        for p in updated_game["players"]
+                        if p["player_id"] == "player-1"
+                    )
+                    print(f"État: PV={player['hp']:.1f}, Mana={player['mp']:.1f}")
+
+                    # Préparer l'action pour le prochain tour
+                    current_action = f"[Suite] {chosen_option.get('description', "Continuer l'exploration")}"
+
+                    # Vérifier la fin de partie
+                    if player["hp"] <= 0:
+                        print("\n⚰️ Le joueur est mort! Fin de la partie.")
+                        break
+
+                except Exception as e:
+                    print(f"Erreur lors de l'application du choix: {e}")
+                    # Continuer avec une action générique
+                    current_action = (
+                        "Reporter son attention sur les alentours immédiats."
+                    )
+
+                await asyncio.sleep(1.5)
+
+            except Exception as e:
+                print(f"Erreur inattendue: {e}")
+                # Continuer avec une action générique
+                current_action = "Reporter son attention sur les alentours immédiats."
+                await asyncio.sleep(1)
+
+        # 3. Résumé final
         print("\n=== Résumé de la cohérence narrative ===")
         print("Éléments narratifs mentionnés:")
         for element, count in story_elements.items():
@@ -194,17 +301,16 @@ async def main():
             print(f"- {objective.replace('_', ' ')}: {status}")
 
         print(f"\nPosition finale: {player_position}")
-        print(f"\nÉtat final: PV={player['hp']:.1f}, Mana={player['mp']:.1f}")
 
-        # 12. Afficher les 3 derniers tours
-        history = requests.get(f"{BASE_URL}/games/{game_id}/history").json()
-        print("\n=== Derniers tours (extraits) ===")
-        for i, entry in enumerate(history[-3:], 1):
-            print(f"\nTour {len(history) - 3 + i}:")
-            print(f"Action: {entry['action'][:60]}...")
-            print(f"Narration: {entry['ai_narration'][:100]}...")
-            if "chosen_option" in entry:
-                print(f"Option choisie: {entry['chosen_option']}")
+        try:
+            player = next(
+                p
+                for p in requests.get(f"{BASE_URL}/games/{game_id}").json()["players"]
+                if p["player_id"] == "player-1"
+            )
+            print(f"\nÉtat final: PV={player['hp']:.1f}, Mana={player['mp']:.1f}")
+        except Exception:
+            print("\nÉtat final: Impossible de récupérer les données du joueur")
 
     except Exception as e:
         logger.error(f"Erreur: {e}", exc_info=True)

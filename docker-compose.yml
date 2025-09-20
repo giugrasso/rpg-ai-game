@@ -74,6 +74,14 @@ services:
     ports:
       - "11434:11434"
     entrypoint: [ "/usr/bin/bash", "/entrypoint.sh" ]
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1
+    # Uncomment the following lines to enable GPU support with NVIDIA Docker
+    # Make sure you have the NVIDIA Container Toolkit installed on your host machine
+    # and that your GPU is compatible.
+    # Also, ensure that the base image supports CUDA if needed.
+    # For more details, refer to the NVIDIA documentation:
+    # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
     # deploy:
     #   resources:
     #     reservations:

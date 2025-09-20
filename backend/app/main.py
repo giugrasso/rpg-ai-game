@@ -86,6 +86,7 @@ class Options(BaseModel):
     success_rate: float  # estimated success rate (0.0 to 1.0)
     health_point_change: float  # e.g. -10 for damage, +5 for healing
     mana_point_change: float  # e.g. -5 for spell cost, +3 for regen
+    related_stat: str  # e.g. "force", "intelligence", etc.
 
 
 class AIResponse(BaseModel):
@@ -324,6 +325,8 @@ async def set_ollama_model():
             "ne casse jamais l'immersion. "
             "Interprète cela comme un signe qu'il a été empoisonné, hypnotisé, ensorcelé ou qu'il sombre dans la folie. "
             "Propose des choix qui remettent subtilement le joueur sur la voie de l'objectif et fixe un success_rate à 0.0 si le joueur propose une action absurde ou hors contexte.\n\n"
+            "7. Le joueur possède des statistiques. Il doit toujours avoir au minimum 2 options pour continuer l'aventure. Chaque option doit être en lien avec une statistique.\n\n"
+            "Règles importantes :\n"
             "Tes réponses doivent être immersives, captivantes, et donner envie de continuer à jouer.\n"
             "Ne révèle jamais le scénario à l'avance.\n"
             "Laisse toujours aux joueurs l'opportunité de choisir leur chemin.\n"

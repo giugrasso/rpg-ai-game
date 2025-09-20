@@ -1,4 +1,5 @@
 # backend/app/main.py
+import json
 import logging
 import os
 import random
@@ -218,21 +219,82 @@ async def join_game(game_id: str, character: Character):
 # ------------------------------
 # Build prompt pour l'action
 # ------------------------------
-def build_prompt_for_action(
-    scenario: Scenario, game: Game, action: ActionRequest
-) -> str:
-    prompt = f"Scenario: {scenario.name}\n"
-    prompt += f"Description: {scenario.description}\n"
-    prompt += f"Context: {scenario.context}\n"
-    prompt += f"Objectives: {scenario.objectives}\n"
-    prompt += "Players:\n"
-    for p in game.players:
-        prompt += f"- ID:{p.player_id} Nom:{p.display_name} ({p.role}) HP:{p.hp} MP:{p.mp} Stats:{p.stats}\n"
-    prompt += f"\nAction by {action.player_id}: {action.action}\n"
-    # prompt += (
-    #     "Repond au format JSON en complétant tous les champs"
-    # )
-    return prompt
+def build_chat_messages(scenario: Scenario, game: Game, action: ActionRequest, player: Character) -> list:
+
+    """Construit les messages de chat avec tout l'historique de la conversation"""
+    messages = []
+
+    # Ajouter l'historique complet des actions précédentes
+    for turn, past_action in enumerate(game.history):
+        messages.append({
+            "role": "user",
+            "content": f"""
+            Tour {turn + 1} - Action du joueur {past_action['actor']}:
+            {past_action['action']}
+            """
+        })
+
+        messages.append({
+            "role": "assistant",
+            "content": f"""
+            {{
+              "narration": "{past_action['ai_narration']}",
+              "options": {json.dumps(past_action['options'])}
+            }}
+            """
+        })
+
+    # Ajouter l'action actuelle
+    messages.append({
+        "role": "user",
+        "content": f"""
+        Tour {game.turn + 1} - Nouvelle action:
+        Joueur: {action.player_id} ({player.role})
+        Position: {player.position or 'inconnue'}
+        Stats: {player.stats}
+        PV: {player.hp}/100, Mana: {player.mp}/100
+
+        Action: "{action.action}"
+
+        Instructions:
+        1. Décris la scène en 3-5 phrases riches en détails sensoriels
+        2. Propose 2-3 options d'action avec:
+           - Une description claire et immersive
+           - Un success_rate basé sur les stats du joueur
+           - Des conséquences réalistes (ΔPV/ΔMana)
+        3. Assure-toi que tes options permettent de progresser vers l'objectif: "{scenario.objectives}"
+        """
+    })
+
+    return messages
+
+def create_fallback_response(game: Game, player: Character, action: ActionRequest) -> AIResponse:
+    """Crée une réponse par défaut en cas d'échec du parsing"""
+    return AIResponse(
+        narration=f"""
+        {player.display_name} tente de {action.action.lower()}, mais quelque chose ne se passe pas comme prévu...
+        La jungle semble réagir à votre présence. Des bruits étranges résonnent entre les arbres,
+        et une odeur métallique flotte dans l'air. Vous devez décider de votre prochaine action.
+        """,
+        options=[
+            Option(
+                id=1,
+                description="Explorer prudemment les alentours pour trouver des indices",
+                success_rate=0.7,
+                health_point_change=0.0,
+                mana_point_change=0.0,
+                related_stat="intelligence"
+            ),
+            Option(
+                id=2,
+                description="Se diriger vers la source des bruits étranges",
+                success_rate=0.4,
+                health_point_change=-0.1,
+                mana_point_change=0.0,
+                related_stat="courage"
+            )
+        ]
+    )
 
 
 # ------------------------------
@@ -246,71 +308,73 @@ async def game_action(game_id: str, action: ActionRequest):
     scenario = SCENARIOS.get(game.scenario_id)
     if not scenario:
         raise HTTPException(status_code=500, detail="Scenario not found")
+
+    # Trouver le joueur
     player = next((p for p in game.players if p.player_id == action.player_id), None)
     if not player:
         raise HTTPException(status_code=400, detail="Player not part of this game")
 
-    prompt = build_prompt_for_action(scenario, game, action)
-    logger.debug(f"Prompt sent to Ollama:\n{prompt}")
+    # Construire les messages de chat avec tout l'historique
+    messages = build_chat_messages(scenario, game, action, player)
 
     try:
-        resp = await ollama_client.generate(
+        # Utiliser l'API chat avec l'historique complet
+        response = await ollama_client.chat(
             model="game_master",
-            prompt=prompt,
-            stream=False,
-            format=None,
-        )
-        raw_response = getattr(resp, "response", str(resp))
-        logger.debug(f"Raw AI response: {raw_response}")
-
-        # Nettoyage avancé de la réponse
-        try:
-            # Essayer de trouver un bloc JSON valide dans la réponse
-            json_match = re.search(r"\{.*\}", raw_response, re.DOTALL)
-            if not json_match:
-                # Si aucun JSON n'est trouvé, essayer de parser directement
-                try:
-                    parsed = AIResponse.model_validate_json(raw_response)
-                except:
-                    # Dernier recours: extraire manuellement les données
-                    logger.error(
-                        "Réponse AI invalide, tentative de récupération manuelle"
-                    )
-                    parsed = extract_ai_response_manually(raw_response)
-            else:
-                cleaned_json = json_match.group(0)
-                # Nettoyer les commentaires JSON si présents
-                cleaned_json = re.sub(r"//.*?\n", "", cleaned_json)
-                cleaned_json = re.sub(r"/\*.*?\*/", "", cleaned_json, flags=re.DOTALL)
-                parsed = AIResponse.model_validate_json(cleaned_json)
-
-        except Exception as e:
-            logger.error(f"Échec du parsing: {e}")
-            logger.error(f"Réponse problématique: {raw_response}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Format de réponse IA invalide: {str(e)[:200]}",
-            )
-
-        # Stocker les options dans l'historique
-        game.history.append(
-            {
-                "timestamp": datetime.utcnow().isoformat(),
-                "actor": action.player_id,
-                "action": action.action,
-                "ai_narration": parsed.narration,
-                "options": [opt.model_dump() for opt in parsed.options],
+            messages=messages,
+            options={
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "seed": 42  # Pour une meilleure cohérence
             }
         )
+
+        # Extraire et valider la réponse
+        raw_response = response['message']['content']
+        logger.debug(f"Raw AI response: {raw_response}")
+
+        try:
+            parsed = AIResponse.model_validate_json(raw_response)
+        except Exception as e:
+            logger.error(f"Failed to parse AI response: {e}")
+            # Tentative de récupération
+            try:
+                json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+                if json_match:
+                    parsed = AIResponse.model_validate_json(json_match.group(0))
+                else:
+                    parsed = create_fallback_response(game, player, action)
+            except Exception as e2:
+                logger.error(f"Manual extraction failed: {e2}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Impossible de traiter la réponse de l'IA"
+                )
+
+        # Mettre à jour l'historique avec la réponse
+        game.history.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "actor": action.player_id,
+            "action": action.action,
+            "ai_narration": parsed.narration,
+            "options": [opt.model_dump() for opt in parsed.options],
+            "context": {
+                "scenario": scenario.name,
+                "player_stats": player.stats,
+                "player_position": player.position or "unknown",
+                "turn": game.turn
+            }
+        })
+
         game.turn += 1
         game.last_updated = datetime.utcnow()
         return parsed
 
     except Exception as exc:
-        logger.error(f"Appel à Ollama échoué: {exc}")
+        logger.error(f"Ollama chat failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Appel à Ollama échoué: {str(exc)[:200]}",
+            detail=f"Erreur avec l'API chat: {str(exc)[:200]}"
         )
 
 

@@ -265,16 +265,14 @@ async def game_action(game_id: str, action: ActionRequest):
                 detail=f"Invalid AI response format: {e}",
             )
 
-        # Appliquer les changements de HP/MP basés sur l'option choisie (simulation)
-        # Note : En pratique, vous appliquerez ces changements après que le joueur ait choisi une option.
-        # Ici, on stocke juste les options pour que le client puisse les afficher.
+        # Stocker les options dans l'historique sous forme de liste de dictionnaires
         game.history.append(
             {
                 "timestamp": datetime.utcnow().isoformat(),
                 "actor": action.player_id,
                 "action": action.action,
                 "ai_narration": parsed.narration,
-                "options": parsed.options,  # Stocke les options pour référence
+                "options": [opt.model_dump() for opt in parsed.options],  # Conversion en dict
             }
         )
         game.turn += 1
@@ -512,30 +510,43 @@ async def choose_option(game_id: str, req: ChooseOptionRequest):
     if not player:
         raise HTTPException(status_code=400, detail="Player not part of this game")
 
-    # Récupérer la dernière entrée de l'historique pour obtenir les options
     if not game.history:
         raise HTTPException(status_code=400, detail="No action history found")
 
     last_action = game.history[-1]
-    chosen_option = next(
-        (opt for opt in last_action.get("options", []) if opt["id"] == req.option_id),
-        None,
-    )
+    if "options" not in last_action:
+        raise HTTPException(status_code=400, detail="No options in last action")
+
+    # Convertir option_id en entier
+    option_id = int(req.option_id)
+
+    # Rechercher l'option choisie
+    chosen_option = None
+    for opt in last_action["options"]:
+        if int(opt["id"]) == option_id:
+            chosen_option = opt
+            break
+
     if not chosen_option:
-        raise HTTPException(status_code=400, detail="Option not found")
+        available_ids = [int(opt["id"]) for opt in last_action["options"]]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Option {option_id} not found. Available IDs: {available_ids}"
+        )
 
     # Appliquer les multiplicateurs
     if "health_point_change" in chosen_option:
-        player.hp = max(
-            0, min(100, player.hp + chosen_option["health_point_change"] * 100)
-        )  # 100 = HP max
-    if "mana_point_change" in chosen_option:
-        player.mp = max(
-            0, min(100, player.mp + chosen_option["mana_point_change"] * 100)
-        )  # 100 = MP max
+        hp_change = chosen_option["health_point_change"] * 100
+        player.hp = max(0, min(100, player.hp + hp_change))
+        logger.debug(f"HP updated: {player.hp} (change: {hp_change})")
 
-    # Mettre à jour l'historique avec le choix
-    last_action["chosen_option"] = req.option_id
+    if "mana_point_change" in chosen_option:
+        mp_change = chosen_option["mana_point_change"] * 100
+        player.mp = max(0, min(100, player.mp + mp_change))
+        logger.debug(f"MP updated: {player.mp} (change: {mp_change})")
+
+    # Mettre à jour l'historique
+    last_action["chosen_option"] = option_id
     game.last_updated = datetime.utcnow()
 
     return game

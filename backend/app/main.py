@@ -1,17 +1,22 @@
 # backend/app/main.py
+import logging
 import os
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 
 # Ollama async client
 from ollama import AsyncClient  # pip install ollama
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="RPG AI Game - Scenario-driven Backend (Async Ollama)")
 
@@ -80,18 +85,25 @@ class ActionRequest(BaseModel):
     )
 
 
-class Options(BaseModel):
+class Option(BaseModel):
     id: int
     description: str
-    success_rate: float  # estimated success rate (0.0 to 1.0)
-    health_point_change: float  # e.g. -10 for damage, +5 for healing
-    mana_point_change: float  # e.g. -5 for spell cost, +3 for regen
+    success_rate: float = Field(ge=0.0, le=1.0)  # estimated success rate (0.0 to 1.0)
+    health_point_change: float = Field(ge=-1.0, le=1.0)
+    mana_point_change: float = Field(ge=-1.0, le=1.0)
     related_stat: str  # e.g. "force", "intelligence", etc.
 
 
 class AIResponse(BaseModel):
     narration: str
-    options: Optional[List[Options]]
+    options: Optional[List[Option]] = []
+    delta_state: Optional[List[Dict[str, Any]]] = []
+
+    @field_validator("options", mode="before")
+    def validate_options(cls, v):
+        if v is None:
+            return []
+        return v
 
 
 # ---------------------------
@@ -117,6 +129,7 @@ async def create_scenario(scenario: Scenario):
     if scenario.id in SCENARIOS:
         raise HTTPException(status_code=409, detail="Scenario already exists")
     SCENARIOS[scenario.id] = scenario
+    logger.info(f"Scenario created: {scenario.id}")
     return scenario
 
 
@@ -149,6 +162,7 @@ async def create_game(req: CreateGameRequest):
 
     game = Game(scenario_id=scenario.id, players=req.initial_players or [])
     GAMES[game.id] = game
+    logger.info(f"Game created: {game.id}")
     return game
 
 
@@ -185,6 +199,7 @@ async def join_game(game_id: str, character: Character):
 
     game.players.append(character)
     game.last_updated = datetime.utcnow()
+    logger.info(f"Player {character.player_id} joined game {game_id}")
     return game
 
 
@@ -226,12 +241,11 @@ async def game_action(game_id: str, action: ActionRequest):
 
     prompt = build_prompt_for_action(scenario, game, action)
 
-    print(f"=== Prompt sent to Ollama ===\n{prompt}\n")
+    logger.info(f"Prompt sent to Ollama:\n{prompt}")
 
     # ------------------------------
     # Appel Ollama Async avec format JSON
     # ------------------------------
-    import json
 
     try:
         resp = await ollama_client.generate(
@@ -241,46 +255,51 @@ async def game_action(game_id: str, action: ActionRequest):
             format=None,  # important pour gpt-oss
         )
 
-        raw_response = getattr(resp, "response", None) or resp
-        if isinstance(raw_response, dict):
-            parsed = raw_response
-        elif isinstance(raw_response, str):
-            parsed = json.loads(raw_response)
-        else:
-            parsed = json.loads(str(raw_response))
+        raw_response = getattr(resp, "response", str(resp))
+        logger.info(f"Raw AI response: {raw_response}")
+
+        # Parse and validate the AI response
+        try:
+            parsed = AIResponse.model_validate_json(raw_response)
+        except Exception as e:
+            logger.error(f"Failed to parse AI response: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Invalid AI response format: {e}",
+            )
+
+        # Apply delta_state to players
+        for change in parsed.delta_state or []:
+            actor_id = change.get("actor")
+            for p in game.players:
+                if p.player_id == actor_id:
+                    if "hp" in change and isinstance(change["hp"], (int, float)):
+                        p.hp = max(0, p.hp + change["hp"])
+                    if "hp_set" in change:
+                        p.hp = int(change["hp_set"])
+                    if "position" in change:
+                        p.position = change["position"]
+
+        # Append to history
+        game.history.append(
+            {
+                "timestamp": datetime.utcnow().isoformat(),
+                "actor": action.player_id,
+                "action": action.action,
+                "ai_narration": parsed.narration,
+            }
+        )
+        game.turn += 1
+        game.last_updated = datetime.utcnow()
+
+        return parsed
+
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Ollama call failed: {exc}")
-
-    # ------------------------------
-    # Appliquer delta_state
-    # ------------------------------
-    for change in parsed.get("delta_state") or []:
-        actor_id = change.get("actor")
-        for p in game.players:
-            if p.player_id == actor_id:
-                if "hp" in change and isinstance(change["hp"], int):
-                    p.hp = max(0, p.hp + change["hp"])
-                if "hp_set" in change:
-                    p.hp = int(change["hp_set"])
-                if "position" in change:
-                    p.position = change["position"]
-
-    # Append to history
-    game.history.append(
-        {
-            "timestamp": datetime.utcnow().isoformat(),
-            "actor": action.player_id,
-            "action": action.action,
-            "ai_narration": parsed.get("narration"),
-        }
-    )
-    game.turn += 1
-    game.last_updated = datetime.utcnow()
-
-    return AIResponse(
-        narration=parsed.get("narration", ""),
-        options=parsed.get("options", []),
-    )
+        logger.error(f"Ollama call failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ollama call failed: {exc}",
+        )
 
 
 @app.get("/games/{game_id}/history", response_model=List[Dict])
@@ -293,15 +312,21 @@ async def game_history(game_id: str):
 
 @app.get("/config/get_model")
 async def get_ollama_model():
-    resp = requests.get("http://ollama:11434/api/tags")
-    resp.raise_for_status()
-    models = resp.json()
-    print(models)
-    for m in models["models"]:
-        print(m)
-        if m.get("name") == "game_master:latest":
-            return {"model_exists": True}
-    raise HTTPException(status_code=404, detail="Master model not found")
+    """Check if the custom Ollama model exists."""
+    try:
+        resp = requests.get("http://ollama:11434/api/tags")
+        resp.raise_for_status()
+        models = resp.json()
+        for m in models["models"]:
+            if m.get("name") == "game_master:latest":
+                return {"model_exists": True}
+        return {"model_exists": False}
+    except Exception as exc:
+        logger.error(f"Failed to check Ollama model: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check Ollama model: {exc}",
+        )
 
 
 @app.post("/config/set_model")
@@ -309,8 +334,8 @@ async def set_ollama_model():
     payload = {
         "model": "game_master",
         "from": AI_MODEL,
-        "system": (
-f"""Tu es un maître du jeu (MJ) expert en jeux de rôle.
+        "system": f"""
+Tu es un maître du jeu (MJ) expert en jeux de rôle.
 
 Ton rôle est de créer une narration immersive et dynamique.
 
@@ -334,24 +359,29 @@ Règles importantes :
     - Le health_point_change est un multiplicateur de points de vie allant de -1.0 à 1.0 (négative pour les dégâts, positive pour la guérison) (health_point_change à 1.0 restaure toute la vie. health_point_change à -1.0 retire toute la vie du joueur en le tuant.).
     - Le mana_point_change est un multiplicateur de points de mana (ou d'énergie) allant de -1.0 à 1.0 (négative pour le coût en mana, positive pour la régénération) (mana_point_change à 1.0 restaure tout le mana (ou d'énergie). mana_point_change à -1.0 retire tout le mana (ou d'énergie) du joueur en l'empechant de prendre une autre action autre que se reposer ou prendre utiliser un objet qui restore du mana (ou d'énergie).).
     - Ne modifie pas les points de vie ou de mana en dehors des actions de combat.
-    - Produis uniquement du JSON strictement valide.
-        Ne mets aucun texte avant ni après. 
 
-        Voici le schéma attendu :
-        {AIResponse.model_json_schema()}
-"""
-        ),
+Produis uniquement du JSON strictement valide.
+Ne mets aucun texte avant ni après. 
+
+Voici le schéma attendu :
+
+{AIResponse.model_json_schema()}
+""",
     }
 
     # headers = {"Content-Type": "application/json"}
 
     try:
-        resp = requests.request("POST", "http://ollama:11434/api/create", json=payload)
+        resp = requests.post("http://ollama:11434/api/create", json=payload)
         resp.raise_for_status()
+        logger.info("Custom Ollama model created successfully.")
+        return {"status": f"model game_master created based on {AI_MODEL}"}
     except Exception as exc:
-        return {"status": f"failed to create model: {exc}"}
-
-    return {"status": f"model game_master created based on {AI_MODEL}"}
+        logger.error(f"Failed to create Ollama model: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create model: {exc}",
+        )
 
 
 # ---------------------------
@@ -398,3 +428,4 @@ async def startup_event():
         ),
     )
     SCENARIOS[sc.id] = sc
+    logger.info(f"Demo scenario created: {sc.id}")

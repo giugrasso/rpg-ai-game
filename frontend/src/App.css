@@ -177,6 +177,12 @@ body {
   border-color: var(--dnd-red);
 }
 
+.card-text {
+  color: var(--dnd-light);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
 /* Style pour les options avec effets D&D */
 .option-card {
   background-color: rgba(26, 18, 11, 0.7);
@@ -187,6 +193,7 @@ body {
   position: relative;
   overflow: hidden;
   transition: all 0.3s;
+  color: var(--dnd-light)
 }
 
 .option-card:hover {

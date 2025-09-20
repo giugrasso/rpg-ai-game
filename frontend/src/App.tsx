@@ -204,7 +204,7 @@ function App() {
           <Col md={8}>
             <GameBoard
               gameState={gameState}
-              aiResponse={aiResponse ? { narration: aiResponse.narration } : undefined}
+              aiResponse={aiResponse ?? undefined}
             />
 
             {/* Options si une réponse AI est disponible */}

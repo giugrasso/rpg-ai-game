@@ -1,5 +1,5 @@
 import { Card, ProgressBar } from 'react-bootstrap'
-import { Player } from '../types/gameTypes.js'  // Ajout de l'extension .js
+import { Player } from '../types/gameTypes'
 
 interface PlayerStatsProps {
   player: Player
@@ -7,53 +7,52 @@ interface PlayerStatsProps {
 
 export function PlayerStats({ player }: PlayerStatsProps) {
   return (
-    <Card>
-      <Card.Header>Votre personnage</Card.Header>
+    <Card className="card-glow">
+      <Card.Header className="dnd-title">Votre personnage</Card.Header>
       <Card.Body>
-        <Card.Title>{player.display_name}</Card.Title>
-        <Card.Subtitle className="mb-2 text-muted">{player.role}</Card.Subtitle>
+        <div className="text-center mb-3">
+          <h4 className="stat-value mb-1">{player.display_name}</h4>
+          <div className="badge stat-badge fs-6">{player.role}</div>
+        </div>
 
-        <div className="mb-3">
-          <div className="mb-2">
-            <div className="d-flex justify-content-between">
-              <span>Points de vie</span>
-              <span>{player.hp.toFixed(1)}/100</span>
+        <div className="stats-container mb-4">
+          <div className="mb-3">
+            <div className="d-flex justify-content-between mb-1">
+              <span className="stat-name">Points de vie</span>
+              <span className="stat-value">{player.hp.toFixed(1)}/100</span>
             </div>
             <ProgressBar
               variant="danger"
               now={player.hp}
               max={100}
-              label={`${player.hp.toFixed(1)}%`}
-              striped
-              animated={player.hp < 30}
+              className="mb-3"
+              style={{ height: '20px' }}
             />
-          </div>
 
-          <div>
-            <div className="d-flex justify-content-between">
-              <span>Mana</span>
-              <span>{player.mp.toFixed(1)}/100</span>
+            <div className="d-flex justify-content-between mb-1">
+              <span className="stat-name">Mana</span>
+              <span className="stat-value">{player.mp.toFixed(1)}/100</span>
             </div>
             <ProgressBar
               variant="primary"
               now={player.mp}
               max={100}
-              label={`${player.mp.toFixed(1)}%`}
+              style={{ height: '20px' }}
             />
           </div>
         </div>
 
-        <Card className="mt-3">
-          <Card.Header>Statistiques</Card.Header>
+        <Card className="stats-container">
+          <Card.Header className="dnd-title">Statistiques</Card.Header>
           <Card.Body>
-            <ul className="list-group list-group-flush">
+            <div className="stat-grid">
               {Object.entries(player.stats).map(([stat, value]) => (
-                <li key={stat} className="list-group-item d-flex justify-content-between">
-                  {stat.charAt(0).toUpperCase() + stat.slice(1)}
-                  <span className="badge bg-secondary">{value}</span>
-                </li>
+                <div key={stat} className="stat-item">
+                  <span className="stat-name">{stat.charAt(0).toUpperCase() + stat.slice(1)}</span>
+                  <span className="stat-value">{value}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </Card.Body>
         </Card>
       </Card.Body>

@@ -1,39 +1,358 @@
-/* Styles personnalisés */
+/* Thème sombre inspiré de Donjons & Dragons */
+:root {
+  --dnd-dark: #1a120b;
+  --dnd-darker: #120a03;
+  --dnd-accent: #d4af37;
+  --dnd-secondary: #6b4f2f;
+  --dnd-red: #9e1b32;
+  --dnd-blue: #2a52be;
+  --dnd-green: #3a724f;
+  --dnd-parchment: #f5e7d3;
+  --dnd-light: #e8d5b5;
+}
+
+body {
+  background-color: var(--dnd-dark);
+  color: var(--dnd-parchment);
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 20%),
+    radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 20%);
+}
+
+.navbar {
+  background-color: var(--dnd-darker) !important;
+  border-bottom: 1px solid var(--dnd-secondary);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.navbar-brand {
+  font-family: 'MedievalSharp', 'Cinzel', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--dnd-accent) !important;
+  text-shadow: 0 0 5px rgba(212, 175, 55, 0.7);
+}
+
+.card {
+  background-color: var(--dnd-darker);
+  border: 1px solid var(--dnd-secondary);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+  border-radius: 0;
+}
+
+.card-header {
+  background-color: var(--dnd-secondary);
+  border-bottom: 1px solid var(--dnd-accent);
+  color: var(--dnd-parchment);
+  font-weight: bold;
+}
+
+.card-body {
+  background-color: rgba(26, 18, 11, 0.8);
+  border: 1px solid rgba(107, 79, 47, 0.3);
+  backdrop-filter: blur(2px);
+}
+
 .narration-text {
   white-space: pre-line;
   font-size: 1.1rem;
-  line-height: 1.6;
+  line-height: 1.8;
+  color: var(--dnd-parchment);
+  background-color: rgba(20, 10, 3, 0.5);
+  padding: 15px;
+  border-left: 3px solid var(--dnd-accent);
+  border-radius: 0 5px 5px 0;
+  position: relative;
+  margin-bottom: 20px;
 }
 
-.progress {
-  border-radius: 4px;
-  height: 20px;
+.narration-text:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -10px;
+  width: 0;
+  height: 0;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+  border-right: 15px solid var(--dnd-accent);
 }
 
-/* Style pour les boutons d'options */
-.btn-option {
-  text-align: left;
-  padding: 1rem;
+.btn-primary {
+  background-color: var(--dnd-accent);
+  border-color: var(--dnd-secondary);
+  color: var(--dnd-dark);
+  font-weight: bold;
+  transition: all 0.3s;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
   border-width: 2px;
-  margin-bottom: 0.5rem;
+}
+
+.btn-primary:hover {
+  background-color: #b89f2d;
+  border-color: #8a6f23;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(212, 175, 55, 0.4);
+}
+
+.btn-outline-primary {
+  background-color: transparent;
+  border-color: var(--dnd-accent);
+  color: var(--dnd-accent);
+  font-weight: bold;
+  transition: all 0.3s;
+  border-width: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-outline-primary:hover {
+  background-color: rgba(212, 175, 55, 0.1);
+  color: var(--dnd-light);
+  border-color: var(--dnd-light);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.btn-option {
+  background-color: rgba(26, 18, 11, 0.7);
+  border: 2px solid var(--dnd-secondary);
+  color: var(--dnd-parchment);
+  margin-bottom: 10px;
+  transition: all 0.3s;
+  text-align: left;
+  padding: 15px;
 }
 
 .btn-option:hover {
-  background-color: rgba(0, 123, 255, 0.1);
+  background-color: rgba(107, 79, 47, 0.5);
+  border-color: var(--dnd-accent);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
 }
 
-/* Style pour les badges */
+.progress {
+  height: 20px;
+  border-radius: 0;
+  background-color: var(--dnd-secondary);
+}
+
+.progress-bar {
+  background-color: var(--dnd-red);
+}
+
+.progress-bar.bg-primary {
+  background-color: var(--dnd-blue);
+}
+
 .badge {
-  font-size: 0.9em;
+  background-color: var(--dnd-secondary);
+  color: var(--dnd-parchment);
+  font-weight: bold;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .narration-text {
-    font-size: 1rem;
-  }
+.badge.bg-primary {
+  background-color: var(--dnd-accent);
+  color: var(--dnd-dark);
+}
 
-  .btn-option {
-    padding: 0.75rem;
-  }
+.list-group-item {
+  background-color: transparent;
+  border-bottom: 1px solid var(--dnd-secondary);
+  color: var(--dnd-parchment);
+}
+
+.spinner-border {
+  color: var(--dnd-accent);
+}
+
+.alert {
+  background-color: rgba(107, 79, 47, 0.7);
+  border-color: var(--dnd-accent);
+  color: var(--dnd-parchment);
+}
+
+.alert-danger {
+  background-color: rgba(158, 27, 50, 0.3);
+  border-color: var(--dnd-red);
+}
+
+/* Style pour les options avec effets D&D */
+.option-card {
+  background-color: rgba(26, 18, 11, 0.7);
+  border: 1px solid var(--dnd-secondary);
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.option-card:hover {
+  background-color: rgba(107, 79, 47, 0.5);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+  transform: translateY(-3px);
+}
+
+.option-card:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, transparent, var(--dnd-accent), transparent);
+}
+
+.option-success {
+  border-left: 3px solid var(--dnd-green);
+}
+
+.option-danger {
+  border-left: 3px solid var(--dnd-red);
+}
+
+.option-neutral {
+  border-left: 3px solid var(--dnd-blue);
+}
+
+.stat-value {
+  font-family: 'MedievalSharp', 'Cinzel', serif;
+  font-size: 1.2rem;
+  color: var(--dnd-accent);
+}
+
+/* Effet parchemin pour les textes importants */
+.parchment-effect {
+  position: relative;
+  padding: 15px;
+  background-color: var(--dnd-parchment);
+  color: var(--dnd-dark);
+  border: 1px solid #d4af37;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.parchment-effect:before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+/* Animation pour les boutons */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+}
+
+.btn-primary:active {
+  animation: pulse 0.5s;
+  transform: translateY(0);
+}
+
+/* Style pour les titres */
+.card-title {
+  color: var(--dnd-accent);
+  font-family: 'MedievalSharp', 'Cinzel', serif;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid var(--dnd-accent);
+  padding-bottom: 5px;
+  margin-bottom: 15px;
+}
+
+/* Style pour les statistiques */
+.stats-container {
+  background-color: rgba(26, 18, 11, 0.7);
+  border: 1px solid var(--dnd-secondary);
+  padding: 15px;
+  border-radius: 5px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(107, 79, 47, 0.3);
+}
+
+.stat-name {
+  color: var(--dnd-light);
+  font-weight: bold;
+}
+
+/* Style pour la barre de navigation */
+.nav-link {
+  color: var(--dnd-parchment) !important;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.nav-link:hover {
+  color: var(--dnd-accent) !important;
+  text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+}
+
+/* Style pour les containers */
+.container {
+  padding-top: 20px;
+}
+
+/* Effet de lumière pour les cartes */
+.card-glow {
+  position: relative;
+}
+
+.card-glow:after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid var(--dnd-accent);
+  opacity: 0;
+  transition: opacity 0.3s;
+  border-radius: 5px;
+  z-index: -1;
+}
+
+.card-glow:hover:after {
+  opacity: 0.3;
+}
+
+/* Style pour les options d'action */
+.action-option {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.action-option:hover {
+  background-color: rgba(212, 175, 55, 0.1);
+}
+
+/* Style pour les badges de stats */
+.stat-badge {
+  background-color: var(--dnd-secondary);
+  color: var(--dnd-accent);
+  font-weight: bold;
+  padding: 5px 10px;
+  border-radius: 15px;
+  border: 1px solid var(--dnd-accent);
+}
+
+/* Fonts pour le thème D&D */
+@font-face {
+  font-family: 'MedievalSharp';
+  src: url('https://fonts.cdnfonts.com/css/medievalsharp') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
 }

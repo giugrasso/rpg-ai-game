@@ -1,229 +1,105 @@
-import { GameState, AIResponse, Scenario, Player, DiceRoll } from '../types/gameTypes.js'  // Ajout de l'extension .js
+import { GameState, AIResponse, Scenario, Player, DiceRoll } from '../types/gameTypes'
 
 const API_BASE = '/api'
 
+// Fonction utilitaire pour gérer les erreurs de réponse
+async function handleResponse(response: Response) {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Erreur ${response.status}: ${JSON.stringify(errorData)}`)
+  }
+
+  const data = await response.json()
+
+  // Vérification minimale de la structure de la réponse
+  if (data.error) {
+    throw new Error(`Erreur API: ${data.error}`)
+  }
+
+  return data
+}
+
 export const GameApi = {
-  /**
-   * Récupère la liste des scénarios disponibles
-   * @returns Promise<Scenario[]> - Liste des scénarios
-   */
+  // Récupérer les scénarios disponibles
   async getScenarios(): Promise<Scenario[]> {
-    try {
-      const response = await fetch(`${API_BASE}/scenarios`)
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de récupération des scénarios: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans getScenarios:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/scenarios`)
+    return handleResponse(response)
   },
 
-  /**
-   * Crée une nouvelle partie
-   * @param scenarioId - ID du scénario choisi
-   * @returns Promise<GameState> - État initial de la partie
-   */
+  // Créer une nouvelle partie
   async createGame(scenarioId: string): Promise<GameState> {
-    try {
-      const response = await fetch(`${API_BASE}/games`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ scenario_id: scenarioId })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de création de partie: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans createGame:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/games`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario_id: scenarioId })
+    })
+    return handleResponse(response)
   },
 
-  /**
-   * Rejoint une partie existante avec un personnage
-   * @param gameId - ID de la partie
-   * @param player - Données du joueur (sans l'ID)
-   * @returns Promise<GameState> - État mis à jour de la partie
-   */
+  // Rejoindre une partie
   async joinGame(gameId: string, player: Omit<Player, 'id'>): Promise<GameState> {
-    try {
-      const response = await fetch(`${API_BASE}/games/${gameId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(player)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de jointure de partie: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans joinGame:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/games/${gameId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(player)
+    })
+    return handleResponse(response)
   },
 
-  /**
-   * Envoie une action au backend
-   * @param gameId - ID de la partie
-   * @param playerId - ID du joueur
-   * @param action - Description de l'action
-   * @returns Promise<AIResponse> - Réponse de l'IA avec narration et options
-   */
+  // Envoyer une action
   async sendAction(gameId: string, playerId: string, action: string): Promise<AIResponse> {
-    try {
-      const response = await fetch(`${API_BASE}/games/${gameId}/action`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ player_id: playerId, action })
-      })
+    const response = await fetch(`${API_BASE}/games/${gameId}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player_id: playerId, action })
+    })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec d'envoi d'action: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
+    const data = await handleResponse(response)
 
-      const data = await response.json()
-
-      // Vérification minimale de la structure de la réponse
-      if (!data.narration || !data.options) {
-        throw new Error("Réponse de l'IA mal formatée: narration ou options manquantes")
-      }
-
-      return data
-    } catch (error) {
-      console.error("Erreur dans sendAction:", error)
-      throw error
+    // Vérification minimale de la structure de la réponse
+    if (!data.narration || !data.options) {
+      throw new Error("Réponse de l'IA mal formatée: narration ou options manquantes")
     }
+
+    return data
   },
 
-  /**
-   * Choisit une option parmi celles proposées
-   * @param gameId - ID de la partie
-   * @param playerId - ID du joueur
-   * @param optionId - ID de l'option choisie
-   * @returns Promise<GameState> - État mis à jour de la partie
-   */
+  // Choisir une option
   async chooseOption(gameId: string, playerId: string, optionId: number): Promise<GameState> {
-    try {
-      const response = await fetch(`${API_BASE}/games/${gameId}/choose`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ player_id: playerId, option_id: optionId })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de choix d'option: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans chooseOption:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/games/${gameId}/choose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player_id: playerId, option_id: optionId })
+    })
+    return handleResponse(response)
   },
 
-  /**
-   * Récupère l'historique d'une partie
-   * @param gameId - ID de la partie
-   * @returns Promise<Array> - Historique des actions
-   */
-  async getHistory(gameId: string): Promise<Array<any>> {
-    try {
-      const response = await fetch(`${API_BASE}/games/${gameId}/history`)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de récupération de l'historique: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans getHistory:", error)
-      throw error
-    }
-  },
-
-  /**
-   * Vérifie si le modèle Ollama est disponible
-   * @returns Promise<{ model_exists: boolean }> - Statut du modèle
-   */
+  // Vérifier le modèle Ollama
   async checkModel(): Promise<{ model_exists: boolean }> {
-    try {
-      const response = await fetch(`${API_BASE}/config/get_model`)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de vérification du modèle: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans checkModel:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/config/get_model`)
+    return handleResponse(response)
   },
 
-  /**
-   * Crée le modèle Ollama si nécessaire
-   * @returns Promise<{ status: string }> - Statut de la création
-   */
+  // Créer le modèle Ollama si nécessaire
   async createModel(): Promise<{ status: string }> {
-    try {
-      const response = await fetch(`${API_BASE}/config/set_model`, {
-        method: 'POST'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de création du modèle: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
-      }
-
-      return response.json()
-    } catch (error) {
-      console.error("Erreur dans createModel:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE}/config/set_model`, {
+      method: 'POST'
+    })
+    return handleResponse(response)
   },
 
-  /**
-   * Récupère le dernier jet de dé
-   * @param gameId - ID de la partie
-   * @returns Promise<DiceRoll|null> - Résultat du dernier jet de dé ou null
-   */
+  // Récupérer le dernier jet de dé
   async getLastRoll(gameId: string): Promise<DiceRoll|null> {
     try {
       const response = await fetch(`${API_BASE}/games/${gameId}/last_roll`)
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null
-        }
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Échec de récupération du jet de dé: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`)
+      if (response.status === 404) {
+        return null
       }
-
-      return response.json()
+      return handleResponse(response)
     } catch (error) {
-      console.error("Erreur dans getLastRoll:", error)
+      if (error instanceof Error && error.message.includes('404')) {
+        return null
+      }
       throw error
     }
   }

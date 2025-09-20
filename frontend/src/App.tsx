@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Container, Row, Col, Spinner, Alert, Navbar, Nav, Button } from 'react-bootstrap'
-import { GameApi } from './api/gameApi.js'  // Ajout de l'extension .js
-import { GameBoard } from './components/GameBoard.js'  // Ajout de l'extension .js
-import { PlayerStats } from './components/PlayerStats.js'  // Ajout de l'extension .js
-import { ActionOptions } from './components/ActionOptions.js'  // Ajout de l'extension .js
-import { GameState, AIResponse, Scenario, Player } from './types/gameTypes.js'  // Ajout de l'extension .js
+import { Container, Row, Col, Spinner, Alert, Navbar, Nav, Button, Card } from 'react-bootstrap'
+import { GameApi } from './api/gameApi'
+import { GameBoard } from './components/GameBoard'
+import { PlayerStats } from './components/PlayerStats'
+import { ActionOptions } from './components/ActionOptions'
+import { GameState, AIResponse, Scenario, Player } from './types/gameTypes'
 import './App.css'
-
 
 function App() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -14,8 +13,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
-  const [currentAction, setCurrentAction] = useState("")
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null)
+  const [currentAction, setCurrentAction] = useState("Observer les alentours pour évaluer la situation")
 
   // Vérifier et créer le modèle Ollama au démarrage
   useEffect(() => {
@@ -46,75 +45,14 @@ function App() {
     }
   }
 
-  // Créer une nouvelle partie
-  const createGame = async (scenarioId: string) => {
-    try {
-      setLoading(true)
-      const newGame = await GameApi.createGame(scenarioId)
-      setGameState(newGame)
-      setError(null)
-    } catch (err) {
-      setError("Impossible de créer la partie: " + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Rejoindre une partie avec un personnage
-  const joinGame = async (gameId: string, player: Omit<Player, 'id'>) => {
-    try {
-      setLoading(true)
-      const updatedGame = await GameApi.joinGame(gameId, player)
-      setGameState(updatedGame)
-      setError(null)
-    } catch (err) {
-      setError("Impossible de rejoindre la partie: " + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Envoyer une action au backend
-  const sendAction = async () => {
-    if (!gameState || !currentAction) return
-
-    try {
-      setLoading(true)
-      const player = gameState.players[0]
-      const response = await GameApi.sendAction(gameState.id, player.player_id, currentAction)
-      setAiResponse(response)
-      setSelectedOption(null)
-    } catch (err) {
-      setError("Erreur lors de l'envoi de l'action: " + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Choisir une option
-  const chooseOption = async (optionId: number) => {
-    if (!gameState || !aiResponse) return
-
-    try {
-      setLoading(true)
-      setSelectedOption(optionId)
-      const player = gameState.players[0]
-      const updatedGame = await GameApi.chooseOption(gameState.id, player.player_id, optionId)
-      setGameState(updatedGame)
-      setAiResponse(null)
-    } catch (err) {
-      setError("Erreur lors du choix de l'option: " + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Exemple de création de partie et ajout d'un joueur
+  // Démarrer une nouvelle partie
   const startExampleGame = async () => {
     if (scenarios.length === 0) return
 
     try {
       setLoading(true)
+      setError(null)
+
       // 1. Créer une partie
       const newGame = await GameApi.createGame(scenarios[0].id)
       setGameState(newGame)
@@ -139,14 +77,73 @@ function App() {
       setGameState(updatedGame)
 
       // 3. Envoyer une action initiale
-      setCurrentAction("Observer les alentours pour évaluer la situation")
       await sendAction()
+
     } catch (err) {
       setError("Erreur lors de la création de la partie: " + (err instanceof Error ? err.message : String(err)))
     } finally {
       setLoading(false)
     }
   }
+
+  // Envoyer une action au backend
+  const sendAction = async () => {
+    if (!gameState) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      const player = gameState.players[0]
+
+      const response = await GameApi.sendAction(
+        gameState.id,
+        player.player_id,
+        currentAction
+      )
+
+      setAiResponse(response)
+      setSelectedOption(null)
+
+    } catch (err) {
+      setError("Erreur lors de l'envoi de l'action: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Choisir une option
+  const chooseOption = async (optionId: number) => {
+    if (!gameState || !aiResponse) return
+
+    try {
+      setLoading(true)
+      setSelectedOption(optionId)
+      const player = gameState.players[0]
+
+      const updatedGame = await GameApi.chooseOption(
+        gameState.id,
+        player.player_id,
+        optionId
+      )
+
+      setGameState(updatedGame)
+      setAiResponse(null)
+
+      // Préparer la prochaine action basée sur la dernière narration
+      if (updatedGame.history.length > 0) {
+        const lastAction = updatedGame.history[updatedGame.history.length - 1]
+        setCurrentAction(`[Suite] ${lastAction.action}`)
+      }
+
+    } catch (err) {
+      setError("Erreur lors du choix de l'option: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Vérifier si le jeu est en attente d'une action
+  const isWaitingForAction = !aiResponse && gameState
 
   if (loading) {
     return (
@@ -159,7 +156,14 @@ function App() {
   }
 
   if (error) {
-    return <Alert variant="danger">{error}</Alert>
+    return (
+      <Container className="mt-5">
+        <Alert variant="danger">{error}</Alert>
+        <Button variant="primary" onClick={startExampleGame} className="mt-3">
+          Réessayer
+        </Button>
+      </Container>
+    )
   }
 
   if (!gameState) {
@@ -167,7 +171,7 @@ function App() {
       <Container className="mt-5 text-center">
         <h2>Bienvenue dans RPG AI Game</h2>
         <p>Sélectionnez un scénario pour commencer</p>
-        <Button variant="primary" onClick={startExampleGame}>
+        <Button variant="primary" onClick={startExampleGame} size="lg">
           Démarrer une partie d'exemple
         </Button>
       </Container>
@@ -175,6 +179,9 @@ function App() {
   }
 
   const player = gameState.players[0]
+  const lastAction = gameState.history.length > 0
+    ? gameState.history[gameState.history.length - 1]
+    : null
 
   return (
     <>
@@ -193,9 +200,12 @@ function App() {
 
       <Container className="mt-4">
         <Row className="g-4">
-          {/* Zone de narration */}
+          {/* Zone de narration - MODIFICATION ICI */}
           <Col md={8}>
-            <GameBoard gameState={gameState} />
+            <GameBoard
+              gameState={gameState}
+              aiResponse={aiResponse ? { narration: aiResponse.narration } : undefined}
+            />
 
             {/* Options si une réponse AI est disponible */}
             {aiResponse && (
@@ -206,42 +216,49 @@ function App() {
                 selectedOption={selectedOption}
               />
             )}
+
+            {/* Bouton pour envoyer une action si nécessaire */}
+            {isWaitingForAction && (
+              <div className="d-grid gap-2 mt-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={sendAction}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                      {' '}Envoi en cours...
+                    </>
+                  ) : (
+                    'Envoyer l\'action actuelle'
+                  )}
+                </Button>
+              </div>
+            )}
           </Col>
 
           {/* Stats du joueur */}
           <Col md={4}>
             <PlayerStats player={player} />
+
+            {/* Informations sur l'action actuelle */}
+            {isWaitingForAction && (
+              <Card className="mt-3">
+                <Card.Header>Action actuelle</Card.Header>
+                <Card.Body>
+                  <Card.Text>{currentAction}</Card.Text>
+                  {lastAction && (
+                    <Card.Text className="mt-2 text-muted small">
+                      Dernière narration: {lastAction.ai_narration.substring(0, 100)}...
+                    </Card.Text>
+                  )}
+                </Card.Body>
+              </Card>
+            )}
           </Col>
         </Row>
-
-        {/* Zone d'action */}
-        {selectedOption === null && aiResponse && (
-          <Row className="mt-3">
-            <Col>
-              <div className="d-grid gap-2">
-                <Button
-                  variant="success"
-                  size="lg"
-                  onClick={() => {
-                    const firstOption = aiResponse.options[0]
-                    if (firstOption) {
-                      chooseOption(firstOption.id)
-                    }
-                  }}
-                >
-                  Choisir la première option rapidement
-                </Button>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={startExampleGame}
-                >
-                  Recommencer une nouvelle partie
-                </Button>
-              </div>
-            </Col>
-          </Row>
-        )}
       </Container>
     </>
   )

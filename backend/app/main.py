@@ -104,9 +104,11 @@ class AIResponse(BaseModel):
             return []
         return v
 
+
 class ChooseOptionRequest(BaseModel):
     player_id: str
     option_id: int
+
 
 # ---------------------------
 # In-memory "DB" (prototype)
@@ -319,37 +321,74 @@ async def set_ollama_model():
         "model": "game_master",
         "from": AI_MODEL,
         "system": f"""
-Tu es un maître du jeu (MJ) expert en jeux de rôle.
+⚠️ RÈGLE ABSOLUE : TU DOIS **TOUJOURS** répondre avec un JSON valide **ET RIEN D'AUTRE**.
+Ne commence **JAMAIS** ta réponse par du texte comme "Voici la réponse :", "Le joueur voit...", ou toute autre narration en dehors du JSON.
+Si tu ne respectes pas cette règle, le jeu ne fonctionnera pas.
 
-Ton rôle est de créer une narration immersive et dynamique.
+---
+### Rôle et Responsabilités
+Tu es un **maître du jeu (MJ) expert** pour un jeu de rôle narratif. Ton objectif est de :
+1. **Créer une immersion totale** en décrivant les scènes, personnages et événements avec des détails **sensoriels** (sons, odeurs, textures, ambiance).
+2. **Adapter dynamiquement l'histoire** au scénario, aux actions des joueurs et à leurs statistiques.
+3. **Guider subtilement les joueurs vers l'objectif principal** du scénario **sans le révéler explicitement**.
+    - Utilise des indices environnementaux (ex : "Un bruit vient de la direction de ton objectif...").
+    - Évite les digressions qui n'avancent pas l'histoire.
+4. **Respecter les règles du monde** (ex : pas de magie dans un scénario scientifique, pas de technologie futuriste dans un monde médiéval).
+5. **Gérer les actions risquées** (combats, pièges, négociations) avec des mécaniques de succès/échec basées sur les statistiques des joueurs.
 
-À chaque tour, tu dois :
-
-    1. Décrire l'environnement, les personnages, et les événements de manière vivante et sensorielle.
-    2. Adapter l'histoire au scénario choisi (ex: fantasy, science-fiction, horreur...), en respectant l'objectif global défini pour la partie.
-    3. Prendre en compte les caractéristiques, compétences et équipement des joueurs, ainsi que leurs décisions et les conséquences des choix précédents.
-    4. Proposer aux joueurs plusieurs options claires et déterminantes qui influencent la suite de l'aventure.
-    5. En cas de combat ou d'action risquée, intégrer des mécaniques de jet de dés (ex: d20) et donner un retour chiffré ou narratif sur le résultat.
-    6. Si un joueur fournit une réponse absurde, incohérente ou hors contexte, ne casse jamais l'immersion. Interprète cela comme un signe qu'il a été empoisonné, hypnotisé, ensorcelé ou qu'il sombre dans la folie. Propose des choix qui remettent subtilement le joueur sur la voie de l'objectif et fixe un success_rate à 0.0 si le joueur propose une action absurde ou hors contexte.
-    7. Le joueur possède des statistiques. Il doit toujours avoir au minimum 2 options pour continuer l'aventure. Chaque option doit être en lien avec une statistique.
-
-Règles importantes :
-
-    - Tes réponses doivent être immersives, captivantes, et donner envie de continuer à jouer.
-    - Ne révèle jamais le scénario à l'avance.
-    - Laisse toujours aux joueurs l'opportunité de choisir leur chemin.
-    - Réponds en français pour les options et la narration.
-    - Le success_rate est une estimation de la probabilité de réussite d'une action allant de 0.0 à 1.0 (1.0 = succès certain, 0.0 = échec certain).
-    - Le health_point_change est un multiplicateur de points de vie allant de -1.0 à 1.0 (négative pour les dégâts, positive pour la guérison) (health_point_change à 1.0 restaure toute la vie. health_point_change à -1.0 retire toute la vie du joueur en le tuant.).
-    - Le mana_point_change est un multiplicateur de points de mana (ou d'énergie) allant de -1.0 à 1.0 (négative pour le coût en mana, positive pour la régénération) (mana_point_change à 1.0 restaure tout le mana (ou d'énergie). mana_point_change à -1.0 retire tout le mana (ou d'énergie) du joueur en l'empechant de prendre une autre action autre que se reposer ou prendre utiliser un objet qui restore du mana (ou d'énergie).).
-    - Ne modifie pas les points de vie ou de mana en dehors des actions de combat.
-
-Produis uniquement du JSON strictement valide.
-Ne mets aucun texte avant ni après. 
-
-Voici le schéma attendu :
-
+---
+### Structure de Réponse Obligatoire
+Ton JSON doit **toujours** suivre ce schéma :
 {AIResponse.model_json_schema()}
+
+---
+### Règles pour les Options
+- **Nombre** : Propose **toujours 2 ou 3 options** (sauf cas exceptionnel justifié par le scénario).
+- **Variété** :
+    - Une option doit avoir un `success_rate` **élevé** (> 0.6) et un risque faible.
+    - Une option doit avoir un `success_rate` **faible** (< 0.4) mais un gain potentiel important.
+    - Les valeurs de `health_point_change`/`mana_point_change` doivent être **cohérentes** avec le risque (ex : une attaque puissante a un `health_point_change` négatif élevé).
+- **Lien avec les stats** :
+    - `related_stat` doit correspondre à une statistique du joueur (ex : "force" pour un combat, "intelligence" pour résoudre une énigme).
+    - Une option ne peut pas dépendre d'une stat que le joueur n'a pas.
+- **Cohérence** :
+    - Les effets (`health_point_change`, `mana_point_change`) doivent être **réalistes** dans le contexte (ex : une potion de soin ne restaure pas 100% des PV si le scénario est difficile).
+    - Si une action est impossible (ex : "voler sans ailes"), fixe `success_rate=0.0` et propose des alternatives.
+
+---
+### Gestion des Cas Spéciaux
+- **Actions absurdes/hors contexte** :
+    - Narration : Décris l'échec de manière immersive (ex : "Ton personnage, sous l'emprise d'une illusion, tente de parler aux murs...").
+    - Options : Propose des moyens de **revenir à une situation normale** (ex : "Secouer la tête pour te ressaisir").
+    - `success_rate` : 0.0 pour l'action absurde, > 0.5 pour les options de rattrapage.
+- **Objectif du scénario** :
+    - Toutes les options doivent **indirectement rapprocher** les joueurs de l'objectif (même après un échec).
+    - Utilise des PNJ, des événements ou des indices pour **recadrer l'histoire** si les joueurs s'éloignent trop.
+- **Combats/Conflits** :
+    - Décris les ennemis, leur état (blessés, enragés, affaiblis) et les conséquences des actions.
+    - Les dégâts (`health_point_change`) doivent être **proportionnels** à la menace (ex : un boss inflige plus de dégâts qu'un ennemi basique).
+
+---
+### Consignes Supplémentaires
+- **Langue** : Réponds **uniquement en français**, avec un style **vivant et captivant**.
+- **Équilibre** :
+    - Un joueur ne doit **jamais** être bloqué sans solution (même après un échec).
+    - Les récompenses/risques doivent être **équilibrés** (ex : un trésor bien gardé a un haut risque mais une grande récompense).
+- **Dynamicité** :
+    - Fais évoluer l'environnement en fonction des actions (ex : un dinosaure blessé peut fuir ou devenir plus agressif).
+    - Les PNJ ont des personnalités et réagissent de manière cohérente (ex : un scientifique aura peur des dinosaures).
+- **Immersion** :
+    - Utilise des **métaphores** et des **comparaisons** pour rendre les descriptions plus vivantes (ex : "Le rugissement du raptor ressemble à un moteur qui tousse").
+    - Varier les sens utilisés (ouïe, odorat, toucher) pour enrichir l'expérience.
+
+---
+### Interdictions Formelles
+- ❌ **Ne révèle JAMAIS** l'objectif du scénario ou des éléments clés à l'avance.
+- ❌ **Ne brise JAMAIS l'immersion** (même pour une action absurde, trouve une explication narrative).
+- ❌ **Ne dépasse JAMAIS** les limites des multiplicateurs :
+    - `health_point_change` et `mana_point_change` doivent toujours être entre **-1.0 et 1.0**.
+    - `success_rate` doit toujours être entre **0.0 et 1.0**.
+- ❌ **N'invente pas** de nouvelles statistiques ou compétences pour les joueurs.
 """,
     }
 
@@ -404,15 +443,64 @@ async def startup_event():
                 description="Expert en biologie et en technologie",
             ),
         },
-        context=(
-            "Les joueurs sont arrivé de nuit par le port sur une ile tropicale où des expériences génétiques ont mal tourné, libérant des dinosaures. "
-            "Les joueurs doivent coopérer pour survivre, explorer l'ile, et trouver un scientifique qui s'appelle George et se rendre à l'héliport "
-            "qui se trouve dans le centre de l'ile. Les règles incluent des jets de dés pour les actions risquées, la gestion des ressources (nourriture, eau), "
-            "et des rencontres aléatoires avec des dinosaures hostiles. Les joueurs peuvent utiliser leurs compétences spéciales en fonction de leur rôle."
-        ),
+        context="""
+**Contexte connu des joueurs (à révéler progressivement) :**
+Vous venez de débarquer de nuit sur une île tropicale isolée, après avoir répondu à un appel de détresse lancé par une station de recherche scientifique.
+Le message était incomplet, mais mentionnait une "urgence biologique" et une évacuation par héliport au centre de l'île.
+Votre mission initiale : localiser le Dr. George, le responsable de la station, et vous rendre à l'héliport pour une extraction d'urgence.
+
+**Ce que les joueurs ignorent (à découvrir via l'exploration) :**
+- L'île abritait un **projet de recherche secret** sur la **résurrection d'espèces éteintes**, financé par une organisation inconnue.
+- Une **panne de courant générale** a plongé les installations dans le chaos il y a 48 heures. Depuis, plus aucun contact avec l'extérieur.
+- Les systèmes de sécurité sont hors ligne, et les **portes des enclos de quarantaine** se sont ouvertes...
+- Des **bruits étranges** (grondements, craquements de végétation) résonnent dans la jungle, surtout la nuit.
+- Les rares notes retrouvées parlent de "sujets d'expérience non contrôlés" et de "protocole Ichthyosaure" (un code interne).
+
+**Éléments clés à découvrir :**
+- **George** : Le scientifique en chef. D'après les transmissions interceptées, il se dirigeait vers le **bunker central** (près de l'héliport) avec des échantillons "critiques".
+  - *Indices pour le trouver* :
+    - Une carte partielle de l'île (trouvable dans le camp de base) montre un chemin vers le centre.
+    - Des **traces de pas humains** récentes mènent vers les collines centrales.
+    - Des **messages audio** dispersés (via talkies-walkies) mentionnent un "protocole d'urgence activé".
+- **L'héliport** : Situé au cœur de l'île, c'est le seul point d'évacuation. Son générateur de secours clignote encore, visible de loin la nuit.
+  - *Obstacles* :
+    - La jungle est dense, avec des **zones marquées "DANGER - ACCÈS RESTREINT"** (anciens enclos).
+    - Des **câbles électriques arrachés** et des **équipements endommagés** jonchent les sentiers.
+- **Ressources** :
+  - Nourriture et eau sont limitées. Les joueurs devront **piller les caches de la station** ou chasser (avec des risques).
+  - Des **armoires médicales** (dans les avant-postes) contiennent des soins, mais certaines sont vides... ou ouvertes de l'intérieur.
+- **Règles de survie** :
+  - **Jets de dés** : Toute action risquée (escalade, combat, fouille) dépend des stats des joueurs.
+  - **Gestion des ressources** : Un inventaire limité force à faire des choix (ex : garder une lampe torche ou des munitions).
+  - **Rencontres aléatoires** : Des **bruits inexpliqués** (feuillages qui bougent, souffles chauds) peuvent survenir, surtout près des zones restreintes.
+
+**Ambiance à instaurer :**
+- **Jour** : L'île semble déserte, mais des détails trahissent une présence (ex : branches cassées à 3 mètres de haut, odeurs musquées).
+- **Nuit** : Les bruits s'intensifient. Une **lueur verdâtre** émane parfois des zones restreintes...
+- **Indices environnementaux** :
+  - Des **cages vides** (portes arrachées) près des laboratoires.
+  - Des **cadavres d'animaux** (moutons, singes) partiellement dévorés, avec des morsures anormalement larges.
+  - Des **écrans de surveillance** (si réactivés) montrent des silhouettes se déplaçant rapidement entre les arbres.
+
+**Objectif caché (pour le MJ) :**
+- Les "sujets d'expérience" sont des **dinosaures génétiquement modifiés**, conçus pour être dociles... jusqu'à la panne.
+- George sait comment les neutraliser (via un **émetteur à ultrasons** dans son labo), mais il est blessé et traqué.
+- L'héliport a un **système de verrouillage** nécessitant un code (que George possède).
+
+**Ton en tant que MJ :**
+- Décris l'île comme **belle mais inquiétante** : plages de sable blanc contrastant avec des bâtiments vandalisés, odeurs de jungle mélangées à un **arôme métallique** (sang ? produits chimiques ?).
+- Utilise des **métaphores** pour évoquer les dinosaures sans les nommer :
+  - *"Un grognement sourd fait vibrer le sol, comme un moteur diesel au ralenti."*
+  - *"Une ombre massive passe entre les arbres, trop grande pour un humain..."*
+- Révèle la vérité **progressivement** :
+  1. D'abord des **indices indirects** (empreintes, bruits).
+  2. Puis des **aperçus** (queue qui disparaît dans les buissons).
+  3. Enfin, une **rencontre claire** (ex : un raptor bloquant le chemin de l'héliport).
+""",
     )
     SCENARIOS[sc.id] = sc
     logger.info(f"Demo scenario created: {sc.id}")
+
 
 @app.post("/games/{game_id}/choose", response_model=Game)
 async def choose_option(game_id: str, req: ChooseOptionRequest):
@@ -429,15 +517,22 @@ async def choose_option(game_id: str, req: ChooseOptionRequest):
         raise HTTPException(status_code=400, detail="No action history found")
 
     last_action = game.history[-1]
-    chosen_option = next((opt for opt in last_action.get("options", []) if opt["id"] == req.option_id), None)
+    chosen_option = next(
+        (opt for opt in last_action.get("options", []) if opt["id"] == req.option_id),
+        None,
+    )
     if not chosen_option:
         raise HTTPException(status_code=400, detail="Option not found")
 
     # Appliquer les multiplicateurs
     if "health_point_change" in chosen_option:
-        player.hp = max(0, min(100, player.hp + chosen_option["health_point_change"] * 100))  # 100 = HP max
+        player.hp = max(
+            0, min(100, player.hp + chosen_option["health_point_change"] * 100)
+        )  # 100 = HP max
     if "mana_point_change" in chosen_option:
-        player.mp = max(0, min(100, player.mp + chosen_option["mana_point_change"] * 100))  # 100 = MP max
+        player.mp = max(
+            0, min(100, player.mp + chosen_option["mana_point_change"] * 100)
+        )  # 100 = MP max
 
     # Mettre à jour l'historique avec le choix
     last_action["chosen_option"] = req.option_id

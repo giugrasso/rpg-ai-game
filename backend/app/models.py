@@ -34,12 +34,12 @@ class Scenario(SQLModel, table=True):
     max_players: int
     context: str
 
-    roles: List["CharacterRoleSQL"] = Relationship(back_populates="scenario")
+    roles: List["CharacterRole"] = Relationship(back_populates="scenario")
 
 
-class CharacterRoleSQL(SQLModel, table=True):
+class CharacterRole(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: str = Field(foreign_key="scenario.id")
+    scenario_id: Optional[str] = Field(foreign_key="scenario.id")
     name: str
     stats: Dict[str, int] = Field(sa_column=Column(JSON))
     description: Optional[str] = None
@@ -86,7 +86,21 @@ class Game(SQLModel, table=True):
 
 # === Pydantic models (for request/response) ===
 
-# === You can add more models as needed ===
+
+class CharacterRoleSchema(BaseModel):
+    name: str
+    stats: Dict[str, int]
+    description: str | None = None
+
+
+class ScenarioSchema(BaseModel):
+    name: str
+    description: str
+    objectives: str
+    mode: GameMode
+    max_players: int
+    context: str
+    roles: List[CharacterRoleSchema]
 
 
 class Option(BaseModel):
@@ -98,7 +112,7 @@ class Option(BaseModel):
     related_stat: str  # e.g. "force", "intelligence", etc.
 
 
-class AIResponse(BaseModel):
+class AIResponseValidator(BaseModel):
     narration: str
     options: List[Option] = []
 

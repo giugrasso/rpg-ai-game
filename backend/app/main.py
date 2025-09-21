@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
-from app.api.routes import config
+from app.api.routes import config, scenarios
 from app.core.db import init_db
-from app.initial_data import initial_data
+from app.initial_data import init_first_scenario, init_game_master
 
 from .logging_config import logger
 
@@ -17,7 +17,11 @@ def on_startup():
     init_db()
 
     logger.info("Inserting initial data...")
-    initial_data()
+    init_game_master()
+
+    logger.info("Inserting initial scenario...")
+    init_first_scenario()
 
 
 app.include_router(config.router, prefix="/config", tags=["config"])
+app.include_router(scenarios.router, prefix="/scenarios", tags=["scenarios"])

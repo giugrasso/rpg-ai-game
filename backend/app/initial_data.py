@@ -3,7 +3,15 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.core.db import engine
-from app.models import AIModel, AIResponse
+from app.models import (
+    AIModel,
+    AIResponseValidator,
+    CharacterRole,
+    CharacterRoleSchema,
+    GameMode,
+    Scenario,
+    ScenarioSchema,
+)
 
 from .logging_config import logger
 
@@ -26,7 +34,7 @@ Tu es un **maître du jeu (MJ) expert** pour un jeu de rôle narratif. Ton objec
 ---
 ### Structure de Réponse Obligatoire
 Ton JSON doit **toujours** suivre ce schéma :
-{AIResponse.model_json_schema()}
+{AIResponseValidator.model_json_schema()}
 
 ---
 ### Règles pour les Options
@@ -49,7 +57,7 @@ Ton JSON doit **toujours** suivre ce schéma :
    - Décris uniquement la conséquence de l'échec dans la narration.
    - NE METS PAS de schéma JSON ou d'explications sur le format.
    - Respecte STRICTEMENT le format requis :
-{AIResponse.model_json_schema()}
+{AIResponseValidator.model_json_schema()}
    - Les options doivent refléter les conséquences de l'échec (ex: 'Se soigner', 'Fuir', 'Tenter une autre approche')."
 
 ---
@@ -89,7 +97,7 @@ Ton JSON doit **toujours** suivre ce schéma :
 """
 
 
-def initial_data():
+def init_game_master():
     with Session(engine) as session:
         model = session.exec(
             select(AIModel).where(AIModel.name == "game_master")
@@ -139,3 +147,146 @@ def initial_data():
                 logger.info("Custom Ollama model created and saved in DB.")
             except Exception as exc:
                 logger.error(f"Failed to create Ollama model: {exc}")
+
+
+def init_first_scenario():
+    with Session(engine) as session:
+        existing = session.exec(
+            select(Scenario).where(Scenario.name == "L'ile des dinosaures")
+        ).first()
+        if existing:
+            logger.info("Initial scenario already exists.")
+            return
+
+        scenario_data = ScenarioSchema(
+            name="L'ile des dinosaures",
+            description="Une ile mystérieuse peuplée de dinosaures issus d'une expérience scientifique.",
+            objectives="Survivre, trouver le scientifique George, et atteindre l'héliport.",
+            mode=GameMode.PVE,
+            max_players=4,
+            roles=[
+                CharacterRoleSchema(
+                    name="Chasseur",
+                    stats={
+                        "force": 18,
+                        "intelligence": 12,
+                        "charisme": 14,
+                        "courage": 16,
+                        "chance": 10,
+                    },
+                    description="Utilise des armes à feu et des pièges",
+                ),
+                CharacterRoleSchema(
+                    name="Scientifique",
+                    stats={
+                        "force": 10,
+                        "intelligence": 18,
+                        "charisme": 14,
+                        "courage": 12,
+                        "chance": 12,
+                    },
+                    description="Connaissances en biologie et chimie",
+                ),
+                CharacterRoleSchema(
+                    name="Médecin",
+                    stats={
+                        "force": 12,
+                        "intelligence": 16,
+                        "charisme": 14,
+                        "courage": 14,
+                        "chance": 10,
+                    },
+                    description="Soigne les blessures et maladies",
+                ),
+                CharacterRoleSchema(
+                    name="Explorateur",
+                    stats={
+                        "force": 14,
+                        "intelligence": 14,
+                        "charisme": 12,
+                        "courage": 16,
+                        "chance": 12,
+                    },
+                    description="Expert en survie et navigation",
+                ),
+            ],
+            context="""
+**Contexte connu des joueurs (à révéler progressivement) :**
+Vous venez de débarquer de nuit sur une île tropicale isolée, après avoir répondu à un appel de détresse lancé par une station de recherche scientifique.
+Le message était incomplet, mais mentionnait une "urgence biologique" et une évacuation par héliport au centre de l'île.
+Votre mission initiale : localiser le Dr. George, le responsable de la station, et vous rendre à l'héliport pour une extraction d'urgence.
+
+**Ce que les joueurs ignorent (à découvrir via l'exploration) :**
+- L'île abritait un **projet de recherche secret** sur la **résurrection d'espèces éteintes**, financé par une organisation inconnue.
+- Une **panne de courant générale** a plongé les installations dans le chaos il y a 48 heures. Depuis, plus aucun contact avec l'extérieur.
+- Les systèmes de sécurité sont hors ligne, et les **portes des enclos de quarantaine** se sont ouvertes...
+- Des **bruits étranges** (grondements, craquements de végétation) résonnent dans la jungle, surtout la nuit.
+- Les rares notes retrouvées parlent de "sujets d'expérience non contrôlés" et de "protocole Ichthyosaure" (un code interne).
+
+**Éléments clés à découvrir :**
+- **George** : Le scientifique en chef. D'après les transmissions interceptées, il se dirigeait vers le **bunker central** (près de l'héliport) avec des échantillons "critiques".
+  - *Indices pour le trouver* :
+    - Une carte partielle de l'île (trouvable dans le camp de base) montre un chemin vers le centre.
+    - Des **traces de pas humains** récentes mènent vers les collines centrales.
+    - Des **messages audio** dispersés (via talkies-walkies) mentionnent un "protocole d'urgence activé".
+- **L'héliport** : Situé au cœur de l'île, c'est le seul point d'évacuation. Son générateur de secours clignote encore, visible de loin la nuit.
+  - *Obstacles* :
+    - La jungle est dense, avec des **zones marquées "DANGER - ACCÈS RESTREINT"** (anciens enclos).
+    - Des **câbles électriques arrachés** et des **équipements endommagés** jonchent les sentiers.
+- **Ressources** :
+  - Nourriture et eau sont limitées. Les joueurs devront **piller les caches de la station** ou chasser (avec des risques).
+  - Des **armoires médicales** (dans les avant-postes) contiennent des soins, mais certaines sont vides... ou ouvertes de l'intérieur.
+- **Règles de survie** :
+  - **Jets de dés** : Toute action risquée (escalade, combat, fouille) dépend des stats des joueurs.
+  - **Gestion des ressources** : Un inventaire limité force à faire des choix (ex : garder une lampe torche ou des munitions).
+  - **Rencontres aléatoires** : Des **bruits inexpliqués** (feuillages qui bougent, souffles chauds) peuvent survenir, surtout près des zones restreintes.
+
+**Ambiance à instaurer :**
+- **Jour** : L'île semble déserte, mais des détails trahissent une présence (ex : branches cassées à 3 mètres de haut, odeurs musquées).
+- **Nuit** : Les bruits s'intensifient. Une **lueur verdâtre** émane parfois des zones restreintes...
+- **Indices environnementaux** :
+  - Des **cages vides** (portes arrachées) près des laboratoires.
+  - Des **cadavres d'animaux** (moutons, singes) partiellement dévorés, avec des morsures anormalement larges.
+  - Des **écrans de surveillance** (si réactivés) montrent des silhouettes se déplaçant rapidement entre les arbres.
+
+**Objectif caché (pour le MJ) :**
+- Les "sujets d'expérience" sont des **dinosaures génétiquement modifiés**, conçus pour être dociles... jusqu'à la panne.
+- George sait comment les neutraliser (via un **émetteur à ultrasons** dans son labo), mais il est blessé et traqué.
+- L'héliport a un **système de verrouillage** nécessitant un code (que George possède).
+
+**Ton en tant que MJ :**
+- Décris l'île comme **belle mais inquiétante** : plages de sable blanc contrastant avec des bâtiments vandalisés, odeurs de jungle mélangées à un **arôme métallique** (sang ? produits chimiques ?).
+- Utilise des **métaphores** pour évoquer les dinosaures sans les nommer :
+  - *"Un grognement sourd fait vibrer le sol, comme un moteur diesel au ralenti."*
+  - *"Une ombre massive passe entre les arbres, trop grande pour un humain..."*
+- Révèle la vérité **progressivement** :
+  1. D'abord des **indices indirects** (empreintes, bruits).
+  2. Puis des **aperçus** (queue qui disparaît dans les buissons).
+  3. Enfin, une **rencontre claire** (ex : un raptor bloquant le chemin de l'héliport).
+""",
+        )
+
+        # Crée le scénario
+        db_scenario = Scenario(
+            name=scenario_data.name,
+            description=scenario_data.description,
+            objectives=scenario_data.objectives,
+            mode=scenario_data.mode,
+            max_players=scenario_data.max_players,
+            context=scenario_data.context,
+            roles=[
+                CharacterRole(
+                    scenario_id="",  # sera rempli par la relation
+                    name=r.name,
+                    stats=r.stats,
+                    description=r.description,
+                )
+                for r in scenario_data.roles
+            ],
+        )
+
+        session.add(db_scenario)
+        session.commit()
+        session.refresh(db_scenario)
+
+        logger.info("Initial scenario with roles created.")

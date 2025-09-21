@@ -7,6 +7,7 @@ def get_gamemasters(db: Session):
     """Retrieve all gamemasters from the database."""
     return db.exec(select(AIModel)).all()
 
+
 def create_gamemaster(db: Session, gamemaster: AIModel):
     """Create a new gamemaster in the database."""
     db.add(gamemaster)

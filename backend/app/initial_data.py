@@ -1,11 +1,11 @@
-import logging
-
 import requests
 from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.core.db import engine
 from app.models import AIModel, AIResponse
+
+from .logging_config import logger
 
 SYSTEM_PROMPT = f"""
 ⚠️ RÈGLE ABSOLUE : TU DOIS **TOUJOURS** répondre avec un JSON valide **ET RIEN D'AUTRE**.
@@ -116,10 +116,10 @@ def initial_data():
             for m in models["models"]:
                 if m.get("name") == "game_master:latest":
                     model_exists = True
-                    logging.info("Custom Ollama model already exists.")
+                    logger.info("Custom Ollama model already exists.")
                     break
         except Exception as exc:
-            logging.error(f"Failed to get Ollama model: {exc}")
+            logger.error(f"Failed to get Ollama model: {exc}")
 
         # Si pas présent dans Ollama → on le crée
         if not model_exists:
@@ -136,6 +136,6 @@ def initial_data():
                 model.installed = True
                 session.add(model)
                 session.commit()
-                logging.info("Custom Ollama model created and saved in DB.")
+                logger.info("Custom Ollama model created and saved in DB.")
             except Exception as exc:
-                logging.error(f"Failed to create Ollama model: {exc}")
+                logger.error(f"Failed to create Ollama model: {exc}")

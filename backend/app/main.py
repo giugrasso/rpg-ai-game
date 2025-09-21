@@ -11,10 +11,12 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
 app = FastAPI()
 
+
 @app.on_event("startup")
 def on_startup():
     init_db()
 
     initial_data()
+
 
 app.include_router(config.router, prefix="/config", tags=["config"])

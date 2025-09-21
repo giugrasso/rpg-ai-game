@@ -95,8 +95,8 @@ def initial_data():
             select(AIModel).where(AIModel.name == "game_master")
         ).first()
 
+        # Création si absent
         if not model:
-            # pas encore dans la DB → on enregistre et on crée le modèle via Ollama
             model = AIModel(
                 name="game_master",
                 base=settings.OLLAMA_MODEL,
@@ -107,9 +107,25 @@ def initial_data():
             session.commit()
             session.refresh(model)
 
+        # Vérification si déjà présent dans Ollama
+        model_exists = False
+        try:
+            resp = requests.get(f"{settings.OLLAMA_SERVER}/api/tags")
+            resp.raise_for_status()
+            models = resp.json()
+            for m in models["models"]:
+                if m.get("name") == "game_master:latest":
+                    model_exists = True
+                    logging.info("Custom Ollama model already exists.")
+                    break
+        except Exception as exc:
+            logging.error(f"Failed to get Ollama model: {exc}")
+
+        # Si pas présent dans Ollama → on le crée
+        if not model_exists:
             try:
                 resp = requests.post(
-                    "http://ollama:11434/api/create",
+                    f"{settings.OLLAMA_SERVER}/api/create",
                     json={
                         "model": "game_master",
                         "from": settings.OLLAMA_MODEL,

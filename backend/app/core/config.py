@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "RPG AI Game"
     PROJECT_VERSION: str = "0.0.1"
+
+    OLLAMA_SERVER: str = "http://ollama:11434"
     OLLAMA_MODEL: str = "gpt-oss:20b"
 
     POSTGRES_SERVER: str = "db"  # docker compose service name

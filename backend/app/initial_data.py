@@ -4,12 +4,12 @@ from sqlmodel import Session, select
 from app.core.config import settings
 from app.core.db import engine
 from app.models import (
-    AIModel,
+    AIModels,
     AIResponseValidator,
-    CharacterRole,
+    CharacterRoles,
     CharacterRoleSchema,
     GameMode,
-    Scenario,
+    Scenarios,
     ScenarioSchema,
 )
 
@@ -100,12 +100,12 @@ Ton JSON doit **toujours** suivre ce schéma :
 def init_game_master():
     with Session(engine) as session:
         model = session.exec(
-            select(AIModel).where(AIModel.name == "game_master")
+            select(AIModels).where(AIModels.name == "game_master")
         ).first()
 
         # Création si absent
         if not model:
-            model = AIModel(
+            model = AIModels(
                 name="game_master",
                 base=settings.OLLAMA_MODEL,
                 system_prompt=SYSTEM_PROMPT,
@@ -152,7 +152,7 @@ def init_game_master():
 def init_first_scenario():
     with Session(engine) as session:
         existing = session.exec(
-            select(Scenario).where(Scenario.name == "L'ile des dinosaures")
+            select(Scenarios).where(Scenarios.name == "L'ile des dinosaures")
         ).first()
         if existing:
             logger.info("Initial scenario already exists.")
@@ -267,7 +267,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
         )
 
         # Crée le scénario
-        db_scenario = Scenario(
+        db_scenario = Scenarios(
             name=scenario_data.name,
             description=scenario_data.description,
             objectives=scenario_data.objectives,
@@ -275,7 +275,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
             max_players=scenario_data.max_players,
             context=scenario_data.context,
             roles=[
-                CharacterRole(
+                CharacterRoles(
                     scenario_id="",  # sera rempli par la relation
                     name=r.name,
                     stats=r.stats,

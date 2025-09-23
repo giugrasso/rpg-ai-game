@@ -8,7 +8,7 @@ from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
 
 # === Database models ===
-class AIModel(SQLModel, table=True):
+class AIModels(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     base: str
@@ -25,7 +25,7 @@ class GameMode(str, Enum):
     PVP = "PvP"
 
 
-class Scenario(SQLModel, table=True):
+class Scenarios(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     name: str
     description: str
@@ -34,20 +34,20 @@ class Scenario(SQLModel, table=True):
     max_players: int
     context: str
 
-    roles: List["CharacterRole"] = Relationship(back_populates="scenario")
+    roles: List["CharacterRoles"] = Relationship(back_populates="scenarios")
 
 
-class CharacterRole(SQLModel, table=True):
+class CharacterRoles(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: Optional[str] = Field(foreign_key="scenario.id")
+    scenario_id: Optional[str] = Field(foreign_key="scenarios.id")
     name: str
     stats: Dict[str, int] = Field(sa_column=Column(JSON))
     description: Optional[str] = None
 
-    scenario: Scenario = Relationship(back_populates="roles")
+    scenarios: Scenarios = Relationship(back_populates="roles")
 
 
-class Character(SQLModel, table=True):
+class Characters(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     display_name: str
     role: str
@@ -55,24 +55,24 @@ class Character(SQLModel, table=True):
     hp: float
     mp: float
     position: Optional[str] = "start"
-    game_id: str = Field(foreign_key="game.id")
+    game_id: str = Field(foreign_key="games.id")
 
     # Relation inverse vers Game
-    game: Optional["Game"] = Relationship(back_populates="characters")
+    games: Optional["Games"] = Relationship(back_populates="characters")
 
 
 class History(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    game_id: str = Field(foreign_key="game.id")
+    game_id: str = Field(foreign_key="games.id")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     player_id: Optional[str] = None  # qui a fait l'action
     action_type: str  # ex: "attack", "move", "heal"
     action_payload: Dict = Field(sa_column=Column(JSON))  # détails de l'action
 
-    game: "Game" = Relationship(back_populates="history_entries")
+    games: "Games" = Relationship(back_populates="history_entries")
 
 
-class Game(SQLModel, table=True):
+class Games(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     scenario_id: str
     turn: int = 0
@@ -80,8 +80,8 @@ class Game(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
-    characters: List[Character] = Relationship(back_populates="game")
-    history_entries: List[History] = Relationship(back_populates="game")
+    characters: List[Characters] = Relationship(back_populates="games")
+    history_entries: List[History] = Relationship(back_populates="games")
 
 
 # === Pydantic models (for request/response) ===

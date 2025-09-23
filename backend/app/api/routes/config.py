@@ -7,11 +7,11 @@ from app.core.db import get_session
 router = APIRouter()
 
 
-@router.get("/aimodel", response_model=list[models.AIModel])
+@router.get("/aimodel", response_model=list[models.AIModels])
 def get_gamemasters(db: Session = Depends(get_session)):
     return crud.get_gamemasters(db)
 
 
-@router.post("/aimodel", response_model=models.AIModel)
-def set_gamemaster(game: models.AIModel, db: Session = Depends(get_session)):
+@router.post("/aimodel", response_model=models.AIModels)
+def set_gamemaster(game: models.AIModels, db: Session = Depends(get_session)):
     return crud.create_gamemaster(db, game)

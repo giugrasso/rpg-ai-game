@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timezone as tz
 from enum import Enum
 from typing import Dict, List, Optional
 from uuid import uuid4
@@ -13,7 +14,7 @@ class AIModels(SQLModel, table=True):
     name: str
     base: str
     system_prompt: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     installed: bool = Field(default=False)
 
 
@@ -64,7 +65,7 @@ class Characters(SQLModel, table=True):
 class History(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     game_id: str = Field(foreign_key="games.id")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     player_id: Optional[str] = None  # qui a fait l'action
     action_type: str  # ex: "attack", "move", "heal"
     action_payload: Dict = Field(sa_column=Column(JSON))  # détails de l'action
@@ -77,8 +78,8 @@ class Games(SQLModel, table=True):
     scenario_id: str
     turn: int = 0
     active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
 
     characters: List[Characters] = Relationship(back_populates="games")
     history_entries: List[History] = Relationship(back_populates="games")

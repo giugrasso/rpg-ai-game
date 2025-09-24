@@ -1,52 +1,75 @@
-from sqlmodel import Session, select
+from typing import List
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlmodel import select
 
 from app.models import AIModels, Scenario, ScenarioRole
 
 
-def get_gamemasters(db: Session):
+async def get_gamemasters(db: AsyncSession):
     """Retrieve all gamemasters from the database."""
-    return db.exec(select(AIModels)).all()
+    result = await db.execute(select(AIModels))
+    return result.scalars().all()
 
 
-def create_gamemaster(db: Session, gamemaster: AIModels) -> AIModels:
+async def create_gamemaster(db: AsyncSession, gamemaster: AIModels) -> AIModels:
     """Create a new gamemaster in the database."""
     db.add(gamemaster)
-    db.commit()
-    db.refresh(gamemaster)
+    await db.commit()
+    await db.refresh(gamemaster)
     return gamemaster
 
 
-def get_scenarios(db: Session):
-    scenarios = db.exec(select(Scenario)).all()
-    # Chaque scénario aura son .roles accessible grâce à Relationship
-    for scenario in scenarios:
-        _ = scenario.roles  # Trigger lazy load si nécessaire
+async def get_scenarios(db: AsyncSession):
+    """Retrieve all scenarios with their roles."""
+    result = await db.execute(
+        select(Scenario).options(selectinload(Scenario.roles))  # type: ignore
+    )
+    scenarios = result.scalars().all()
     return scenarios
 
 
-def is_scenario_name_existing(db: Session, name: str) -> bool:
+async def is_scenario_name_existing(db: AsyncSession, name: str) -> bool:
     """Check if a scenario with the given name already exists."""
-    existing = db.exec(select(Scenario).where(Scenario.name == name)).first()
-    return existing is not None
+    result = await db.execute(select(Scenario).where(Scenario.name == name))
+    scenario = result.scalars().first()
+    return scenario is not None
 
 
-def create_scenario(db: Session, scenario: Scenario) -> Scenario:
+async def create_scenario(db: AsyncSession, scenario: Scenario) -> Scenario:
     """Create a new scenario in the database."""
     db.add(scenario)
-    db.commit()
-    db.refresh(scenario)
+    await db.commit()
+    await db.refresh(scenario)
     return scenario
 
 
-def add_roles_to_scenario(db: Session, scenario_id: str, roles: list):
-    """Add roles to a scenario."""
-    for role_data in roles:
-        role = ScenarioRole(
-            scenario_id=scenario_id,
-            name=role_data.name,
-            stats=role_data.stats,
-            description=role_data.description,
-        )
-        db.add(role)
-    db.commit()
-    return roles
+async def add_roles_to_scenario(
+    db: AsyncSession, scenario_id: str, roles: List["ScenarioRole"]
+) -> List["ScenarioRole"]:
+    """Add roles to a scenario and return the created roles."""
+    created_roles: List["ScenarioRole"] = []
+
+    try:
+        for role_data in roles:
+            role = ScenarioRole(
+                scenario_id=scenario_id,
+                name=role_data.name,
+                stats=role_data.stats,
+                description=role_data.description,
+            )
+            db.add(role)
+            created_roles.append(role)
+
+        await db.commit()
+
+        # Recharge les IDs générés en DB
+        for role in created_roles:
+            await db.refresh(role)
+
+    except Exception:
+        await db.rollback()
+        raise
+
+    return created_roles

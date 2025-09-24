@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from app import crud
 from app.core.db import get_session
-from app.models import Scenarios, ScenarioSchema
+from app.models import Scenario, ScenarioSchema
 
 router = APIRouter()
 
@@ -24,7 +24,7 @@ def create_scenario(scenario_data: ScenarioSchema, db: Session = Depends(get_ses
         )
 
     # Créer le scénario
-    scenario = Scenarios(
+    scenario = Scenario(
         name=scenario_data.name,
         description=scenario_data.description,
         objectives=scenario_data.objectives,

@@ -26,7 +26,7 @@ class GameMode(str, Enum):
     PVP = "PvP"
 
 
-class Scenarios(SQLModel, table=True):
+class Scenario(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     name: str
     description: str
@@ -35,54 +35,62 @@ class Scenarios(SQLModel, table=True):
     max_players: int
     context: str
 
-    roles: List["CharacterRoles"] = Relationship(back_populates="scenarios")
+    # Relations
+    roles: List["ScenarioRole"] = Relationship(back_populates="scenario")
+    games: List["Game"] = Relationship(back_populates="scenario")
 
 
-class CharacterRoles(SQLModel, table=True):
+class ScenarioRole(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: Optional[str] = Field(foreign_key="scenarios.id")
+    scenario_id: Optional[str] = Field(foreign_key="scenario.id")
     name: str
-    stats: Dict[str, int] = Field(sa_column=Column(JSON))
+    stats: Dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
     description: Optional[str] = None
 
-    scenarios: Scenarios = Relationship(back_populates="roles")
+    # Relations
+    scenario: Optional[Scenario] = Relationship(back_populates="roles")
 
 
-class Characters(SQLModel, table=True):
+class Game(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    display_name: str
-    role: str
-    stats: Dict[str, int] = Field(sa_column=Column(JSON))  # stats en JSON
-    hp: float
-    mp: float
-    position: Optional[str] = "start"
-    game_id: str = Field(foreign_key="games.id")
-
-    # Relation inverse vers Game
-    games: Optional["Games"] = Relationship(back_populates="characters")
-
-
-class History(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    game_id: str = Field(foreign_key="games.id")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
-    player_id: Optional[str] = None  # qui a fait l'action
-    action_type: str  # ex: "attack", "move", "heal"
-    action_payload: Dict = Field(sa_column=Column(JSON))  # détails de l'action
-
-    games: "Games" = Relationship(back_populates="history_entries")
-
-
-class Games(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: str
+    scenario_id: str = Field(foreign_key="scenario.id")
     turn: int = 0
     active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     last_updated: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
 
-    characters: List[Characters] = Relationship(back_populates="games")
-    history_entries: List[History] = Relationship(back_populates="games")
+    # Relations
+    scenario: Optional[Scenario] = Relationship(back_populates="games")
+    players: List["Player"] = Relationship(back_populates="game")
+    history_entries: List["History"] = Relationship(back_populates="game")
+
+
+class Player(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    display_name: str
+    role: str
+    stats: Dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
+    hp: float
+    mp: float
+    position: str = Field(default="start")
+    game_id: str = Field(foreign_key="game.id")
+
+    # Relations
+    game: Optional[Game] = Relationship(back_populates="players")
+    history_entries: List["History"] = Relationship(back_populates="player")
+
+
+class History(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    game_id: str = Field(foreign_key="game.id")
+    player_id: Optional[str] = Field(default=None, foreign_key="player.id")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
+    action_type: str  # ex: "attack", "move", "heal"
+    action_payload: Dict = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # Relations
+    game: Game = Relationship(back_populates="history_entries")
+    player: Optional[Player] = Relationship(back_populates="history_entries")
 
 
 # === Pydantic models (for request/response) ===

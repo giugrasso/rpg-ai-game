@@ -6,10 +6,10 @@ from app.core.db import engine
 from app.models import (
     AIModels,
     AIResponseValidator,
-    CharacterRoles,
     CharacterRoleSchema,
     GameMode,
-    Scenarios,
+    Scenario,
+    ScenarioRole,
     ScenarioSchema,
 )
 
@@ -152,7 +152,7 @@ def init_game_master():
 def init_first_scenario():
     with Session(engine) as session:
         existing = session.exec(
-            select(Scenarios).where(Scenarios.name == "L'ile des dinosaures")
+            select(Scenario).where(Scenario.name == "L'ile des dinosaures")
         ).first()
         if existing:
             logger.info("Initial scenario already exists.")
@@ -267,7 +267,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
         )
 
         # Crée le scénario
-        db_scenario = Scenarios(
+        db_scenario = Scenario(
             name=scenario_data.name,
             description=scenario_data.description,
             objectives=scenario_data.objectives,
@@ -275,7 +275,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
             max_players=scenario_data.max_players,
             context=scenario_data.context,
             roles=[
-                CharacterRoles(
+                ScenarioRole(
                     scenario_id="",  # sera rempli par la relation
                     name=r.name,
                     stats=r.stats,

@@ -10,17 +10,17 @@ app = FastAPI()
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     logger.info("Starting up...")
 
     logger.info("Initializing database...")
-    init_db()
+    await init_db()
 
     logger.info("Inserting initial data...")
-    init_game_master()
+    await init_game_master()
 
     logger.info("Inserting initial scenario...")
-    init_first_scenario()
+    await init_first_scenario()
 
 
 app.include_router(config.router, prefix="/config", tags=["config"])

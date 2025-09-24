@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
-from app.models import AIModels, Scenario, ScenarioRole
+from app.models import AIModels, CharacterRoleSchema, Scenario, ScenarioRole
 
 
 async def get_gamemasters(db: AsyncSession):
@@ -46,7 +46,7 @@ async def create_scenario(db: AsyncSession, scenario: Scenario) -> Scenario:
 
 
 async def add_roles_to_scenario(
-    db: AsyncSession, scenario_id: str, roles: List["ScenarioRole"]
+    db: AsyncSession, scenario_id: str, roles: List[CharacterRoleSchema]
 ) -> List["ScenarioRole"]:
     """Add roles to a scenario and return the created roles."""
     created_roles: List["ScenarioRole"] = []

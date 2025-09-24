@@ -1,8 +1,8 @@
 import requests
-from sqlmodel import Session, select
+from sqlmodel import select
 
 from app.core.config import settings
-from app.core.db import engine
+from app.core.db import async_session
 from app.models import (
     AIModels,
     AIResponseValidator,
@@ -97,11 +97,12 @@ Ton JSON doit **toujours** suivre ce schéma :
 """
 
 
-def init_game_master():
-    with Session(engine) as session:
-        model = session.exec(
+async def init_game_master():
+    async with async_session() as session:  # type: ignore
+        result = await session.execute(
             select(AIModels).where(AIModels.name == "game_master")
-        ).first()
+        )
+        model = result.scalars().first()
 
         # Création si absent
         if not model:
@@ -112,8 +113,8 @@ def init_game_master():
                 installed=False,
             )
             session.add(model)
-            session.commit()
-            session.refresh(model)
+            await session.commit()
+            await session.refresh(model)
 
         # Vérification si déjà présent dans Ollama
         model_exists = False
@@ -143,17 +144,20 @@ def init_game_master():
                 resp.raise_for_status()
                 model.installed = True
                 session.add(model)
-                session.commit()
+                await session.commit()
+                await session.refresh(model)
                 logger.info("Custom Ollama model created and saved in DB.")
             except Exception as exc:
                 logger.error(f"Failed to create Ollama model: {exc}")
 
 
-def init_first_scenario():
-    with Session(engine) as session:
-        existing = session.exec(
+async def init_first_scenario():
+    async with async_session() as session:  # type: ignore
+        result = await session.execute(
             select(Scenario).where(Scenario.name == "L'ile des dinosaures")
-        ).first()
+        )
+
+        existing = result.scalars().first()
         if existing:
             logger.info("Initial scenario already exists.")
             return
@@ -286,7 +290,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
         )
 
         session.add(db_scenario)
-        session.commit()
-        session.refresh(db_scenario)
+        await session.commit()
+        await session.refresh(db_scenario)
 
         logger.info("Initial scenario with roles created.")

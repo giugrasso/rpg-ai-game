@@ -12,7 +12,7 @@ async def get_gamemasters(db: AsyncSession = Depends(get_session)):
     return await crud.get_gamemasters(db)
 
 
-@router.post("/aimodel", response_model=models.AIModels)
+@router.post("/aimodel", response_model=models.AIModels, status_code=201)
 async def set_gamemaster(
     game: models.AIModels, db: AsyncSession = Depends(get_session)
 ):

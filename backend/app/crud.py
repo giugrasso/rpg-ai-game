@@ -1,11 +1,37 @@
 from typing import List, Sequence
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import SQLModel, select
 
-from app.models import AIModels, CharacterRoleSchema, Game, Scenario, ScenarioRole
+from app.core.config import settings
+from app.models import (
+    AIModels,
+    CharacterRoleSchema,
+    Game,
+    Player,
+    Scenario,
+    ScenarioRole,
+)
+
+# === Database management ===
+
+
+async def destroy_db():
+    """Destroy all tables in the database."""
+
+    engine = create_async_engine(
+        str(settings.SQLALCHEMY_DATABASE_URI),
+        echo=True,
+        future=True,
+    )
+
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+
+
+# === Gamemaster CRUD operations ===
 
 
 async def get_gamemasters(db: AsyncSession):
@@ -20,6 +46,21 @@ async def create_gamemaster(db: AsyncSession, gamemaster: AIModels) -> AIModels:
     await db.commit()
     await db.refresh(gamemaster)
     return gamemaster
+
+
+async def get_gamemaster(db: AsyncSession, gamemaster_id: int) -> AIModels | None:
+    """Retrieve a gamemaster by its ID."""
+    result = await db.execute(select(AIModels).where(AIModels.id == gamemaster_id))
+    return result.scalars().first()
+
+
+async def delete_gamemaster(db: AsyncSession, gamemaster: AIModels) -> None:
+    """Delete a gamemaster from the database."""
+    await db.delete(gamemaster)
+    await db.commit()
+
+
+# === Scenario CRUD operations ===
 
 
 async def get_scenarios(db: AsyncSession):
@@ -75,6 +116,10 @@ async def add_roles_to_scenario(
 
     return created_roles
 
+
+# === Game CRUD operations ===
+
+
 async def get_games(db: AsyncSession) -> Sequence[Game]:
     """Retrieve all games with their scenarios."""
     result = await db.execute(
@@ -82,9 +127,57 @@ async def get_games(db: AsyncSession) -> Sequence[Game]:
     )
     return result.scalars().all()
 
+
 async def create_game(db: AsyncSession, game: Game) -> Game:
     """Create a new game in the database."""
     db.add(game)
     await db.commit()
     await db.refresh(game)
     return game
+
+
+async def get_game(db: AsyncSession, game_id: UUID) -> Game | None:
+    """Retrieve a game by its ID."""
+    result = await db.execute(
+        select(Game).where(Game.id == game_id).options(selectinload(Game.scenario))  # type: ignore
+    )
+    return result.scalars().first()
+
+
+async def delete_game(db: AsyncSession, game: Game) -> None:
+    """Delete a game from the database."""
+    await db.delete(game)
+    await db.commit()
+
+
+# === Player CRUD operations ===
+
+
+async def get_players(db: AsyncSession) -> Sequence[Player]:
+    """Retrieve all players with their games."""
+    result = await db.execute(
+        select(Player).options(selectinload(Player.game))  # type: ignore
+    )
+    return result.scalars().all()
+
+
+async def create_player(db: AsyncSession, player: Player) -> Player:
+    """Create a new player in the database."""
+    db.add(player)
+    await db.commit()
+    await db.refresh(player)
+    return player
+
+
+async def get_player(db: AsyncSession, player_id: UUID) -> Player | None:
+    """Retrieve a player by its ID."""
+    result = await db.execute(
+        select(Player).where(Player.id == player_id).options(selectinload(Player.game))  # type: ignore
+    )
+    return result.scalars().first()
+
+
+async def delete_player(db: AsyncSession, player: Player) -> None:
+    """Delete a player from the database."""
+    await db.delete(player)
+    await db.commit()

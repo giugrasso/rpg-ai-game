@@ -280,7 +280,7 @@ Votre mission initiale : localiser le Dr. George, le responsable de la station, 
             context=scenario_data.context,
             roles=[
                 ScenarioRole(
-                    scenario_id="",  # sera rempli par la relation
+                    scenario_id=None,  # sera rempli par la relation
                     name=r.name,
                     stats=r.stats,
                     description=r.description,

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app import crud, models
@@ -10,7 +12,7 @@ router = APIRouter()
 async def get_games(db: AsyncSession = Depends(get_session)):
     return await crud.get_games(db)
 
-@router.post("/game", response_model=models.GameSchema, status_code=201)
+@router.post("/game", response_model=models.Game, status_code=201)
 async def create_game(
     game: models.GameSchema, db: AsyncSession = Depends(get_session)
 ):
@@ -22,3 +24,18 @@ async def create_game(
     )
     await crud.create_game(db, game_obj)
     return game_obj
+
+@router.get("/game/{game_id}", response_model=models.Game)
+async def get_game(game_id: UUID, db: AsyncSession = Depends(get_session)):
+    game = await crud.get_game(db, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
+
+@router.delete("/game/{game_id}", status_code=204)
+async def delete_game(game_id: UUID, db: AsyncSession = Depends(get_session)):
+    game = await crud.get_game(db, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    await crud.delete_game(db, game)
+    return None

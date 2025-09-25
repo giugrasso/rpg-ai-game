@@ -117,6 +117,22 @@ async def add_roles_to_scenario(
     return created_roles
 
 
+async def get_scenario(db: AsyncSession, scenario_id: UUID) -> Scenario | None:
+    """Retrieve a scenario by its ID."""
+    result = await db.execute(
+        select(Scenario)
+        .where(Scenario.id == scenario_id)
+        .options(selectinload(Scenario.roles))  # type: ignore
+    )
+    return result.scalars().first()
+
+
+async def delete_scenario(db: AsyncSession, scenario: Scenario) -> None:
+    """Delete a scenario from the database."""
+    await db.delete(scenario)
+    await db.commit()
+
+
 # === Game CRUD operations ===
 
 

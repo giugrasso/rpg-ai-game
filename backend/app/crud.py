@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, select
 
 from app.core.config import settings
 from app.models import (
-    AIModels,
+    AIModel,
     CharacterRoleSchema,
     Game,
     Player,
@@ -36,11 +36,11 @@ async def destroy_db():
 
 async def get_gamemasters(db: AsyncSession):
     """Retrieve all gamemasters from the database."""
-    result = await db.execute(select(AIModels))
+    result = await db.execute(select(AIModel))
     return result.scalars().all()
 
 
-async def create_gamemaster(db: AsyncSession, gamemaster: AIModels) -> AIModels:
+async def create_gamemaster(db: AsyncSession, gamemaster: AIModel) -> AIModel:
     """Create a new gamemaster in the database."""
     db.add(gamemaster)
     await db.commit()
@@ -48,13 +48,13 @@ async def create_gamemaster(db: AsyncSession, gamemaster: AIModels) -> AIModels:
     return gamemaster
 
 
-async def get_gamemaster(db: AsyncSession, gamemaster_id: int) -> AIModels | None:
+async def get_gamemaster(db: AsyncSession, gamemaster_id: int) -> AIModel | None:
     """Retrieve a gamemaster by its ID."""
-    result = await db.execute(select(AIModels).where(AIModels.id == gamemaster_id))
+    result = await db.execute(select(AIModel).where(AIModel.id == gamemaster_id))
     return result.scalars().first()
 
 
-async def delete_gamemaster(db: AsyncSession, gamemaster: AIModels) -> None:
+async def delete_gamemaster(db: AsyncSession, gamemaster: AIModel) -> None:
     """Delete a gamemaster from the database."""
     await db.delete(gamemaster)
     await db.commit()

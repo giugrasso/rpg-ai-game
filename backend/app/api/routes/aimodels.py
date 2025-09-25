@@ -9,19 +9,19 @@ router = APIRouter()
 # === Gamemaster Routes ===
 
 
-@router.get("/aimodels", response_model=list[models.AIModels])
+@router.get("/aimodels", response_model=list[models.AIModel])
 async def get_gamemasters(db: AsyncSession = Depends(get_session)):
     return await crud.get_gamemasters(db)
 
 
-@router.post("/aimodel", response_model=models.AIModels, status_code=201)
+@router.post("/aimodel", response_model=models.AIModel, status_code=201)
 async def set_gamemaster(
-    game: models.AIModels, db: AsyncSession = Depends(get_session)
+    game: models.AIModel, db: AsyncSession = Depends(get_session)
 ):
     return await crud.create_gamemaster(db, game)
 
 
-@router.get("/aimodel/{gamemaster_id}", response_model=models.AIModels)
+@router.get("/aimodel/{gamemaster_id}", response_model=models.AIModel)
 async def get_gamemaster(gamemaster_id: int, db: AsyncSession = Depends(get_session)):
     gamemaster = await crud.get_gamemaster(db, gamemaster_id)
     if not gamemaster:

@@ -4,7 +4,7 @@ from sqlmodel import select
 from app.core.config import settings
 from app.core.db import async_session
 from app.models import (
-    AIModels,
+    AIModel,
     AIResponseValidator,
     CharacterRoleSchema,
     GameMode,
@@ -100,13 +100,13 @@ Ton JSON doit **toujours** suivre ce schéma :
 async def init_game_master():
     async with async_session() as session:  # type: ignore
         result = await session.execute(
-            select(AIModels).where(AIModels.name == "game_master")
+            select(AIModel).where(AIModel.name == "game_master")
         )
         model = result.scalars().first()
 
         # Création si absent
         if not model:
-            model = AIModels(
+            model = AIModel(
                 name="game_master",
                 base=settings.OLLAMA_MODEL,
                 system_prompt=SYSTEM_PROMPT,

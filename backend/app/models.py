@@ -9,7 +9,7 @@ from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
 
 # === Database models ===
-class AIModels(SQLModel, table=True):
+class AIModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     base: str

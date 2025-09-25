@@ -11,7 +11,8 @@ router = APIRouter()
     "/dbdestroy",
     status_code=204,
     summary="Destroy all tables in the database",
-    description="This will delete all data and tables in the database. Use with caution.",
+    description="For development ONLY. This will delete all data and tables in the database. Use with caution.",
+    name="Destroy Database",
 )
 async def destroy_db():
     await crud.destroy_db()

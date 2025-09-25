@@ -2,7 +2,7 @@ from datetime import datetime
 from datetime import timezone as tz
 from enum import Enum
 from typing import Dict, List, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, field_validator
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel
@@ -27,7 +27,7 @@ class GameMode(str, Enum):
 
 
 class Scenario(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str
     description: str
     objectives: str
@@ -41,8 +41,8 @@ class Scenario(SQLModel, table=True):
 
 
 class ScenarioRole(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: Optional[str] = Field(foreign_key="scenario.id")
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    scenario_id: Optional[UUID] = Field(foreign_key="scenario.id")
     name: str
     stats: Dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
     description: Optional[str] = None
@@ -52,8 +52,8 @@ class ScenarioRole(SQLModel, table=True):
 
 
 class Game(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    scenario_id: str = Field(foreign_key="scenario.id")
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    scenario_id: UUID = Field(foreign_key="scenario.id")
     turn: int = 0
     active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
@@ -66,14 +66,14 @@ class Game(SQLModel, table=True):
 
 
 class Player(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     display_name: str
     role: str
     stats: Dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
     hp: float
     mp: float
     position: str = Field(default="start")
-    game_id: str = Field(foreign_key="game.id")
+    game_id: UUID = Field(foreign_key="game.id")
 
     # Relations
     game: Optional[Game] = Relationship(back_populates="players")
@@ -81,9 +81,9 @@ class Player(SQLModel, table=True):
 
 
 class History(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    game_id: str = Field(foreign_key="game.id")
-    player_id: Optional[str] = Field(default=None, foreign_key="player.id")
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    game_id: UUID = Field(foreign_key="game.id")
+    player_id: Optional[UUID] = Field(default=None, foreign_key="player.id")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     action_type: str  # ex: "attack", "move", "heal"
     action_payload: Dict = Field(default_factory=dict, sa_column=Column(JSON))
@@ -130,3 +130,9 @@ class AIResponseValidator(BaseModel):
         if v is None:
             return []
         return v
+
+
+class GameSchema(BaseModel):
+    scenario_id: UUID
+    turn: int = 0
+    active: bool = True

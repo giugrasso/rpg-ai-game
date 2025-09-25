@@ -8,12 +8,12 @@ from app.models import Scenario, ScenarioSchema
 router = APIRouter()
 
 
-@router.get("/scenarios/", response_model=list[ScenarioSchema])
+@router.get("/scenarios/", response_model=list[Scenario])
 async def get_scenarios(db: AsyncSession = Depends(get_session)):
     return await crud.get_scenarios(db)
 
 
-@router.post("/scenario/", response_model=ScenarioSchema, status_code=201)
+@router.post("/scenario/", response_model=Scenario, status_code=201)
 async def create_scenario(
     scenario_data: ScenarioSchema, db: AsyncSession = Depends(get_session)
 ):

@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Sequence
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
-from app.models import AIModels, CharacterRoleSchema, Scenario, ScenarioRole
+from app.models import AIModels, CharacterRoleSchema, Game, Scenario, ScenarioRole
 
 
 async def get_gamemasters(db: AsyncSession):
@@ -46,7 +47,7 @@ async def create_scenario(db: AsyncSession, scenario: Scenario) -> Scenario:
 
 
 async def add_roles_to_scenario(
-    db: AsyncSession, scenario_id: str, roles: List[CharacterRoleSchema]
+    db: AsyncSession, scenario_id: UUID, roles: List[CharacterRoleSchema]
 ) -> List["ScenarioRole"]:
     """Add roles to a scenario and return the created roles."""
     created_roles: List["ScenarioRole"] = []
@@ -73,3 +74,17 @@ async def add_roles_to_scenario(
         raise
 
     return created_roles
+
+async def get_games(db: AsyncSession) -> Sequence[Game]:
+    """Retrieve all games with their scenarios."""
+    result = await db.execute(
+        select(Game).options(selectinload(Game.scenario))  # type: ignore
+    )
+    return result.scalars().all()
+
+async def create_game(db: AsyncSession, game: Game) -> Game:
+    """Create a new game in the database."""
+    db.add(game)
+    await db.commit()
+    await db.refresh(game)
+    return game

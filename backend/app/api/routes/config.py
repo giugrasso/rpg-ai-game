@@ -7,7 +7,7 @@ from app.core.db import get_session
 router = APIRouter()
 
 
-@router.get("/aimodel", response_model=list[models.AIModels])
+@router.get("/aimodels", response_model=list[models.AIModels])
 async def get_gamemasters(db: AsyncSession = Depends(get_session)):
     return await crud.get_gamemasters(db)
 

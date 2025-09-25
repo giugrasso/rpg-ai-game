@@ -1,17 +1,16 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-from app.api.routes import admin, games, players, scenarios
+from app.api.routes import admin, ai_models, games, players, scenarios
 from app.core.db import init_db
 from app.initial_data import init_first_scenario, init_game_master
-from backend.app.api.routes import ai_models
 
 from .logging_config import logger
 
-app = FastAPI()
 
-
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     logger.info("Starting up...")
 
     logger.info("Initializing database...")
@@ -22,6 +21,15 @@ async def on_startup():
 
     logger.info("Inserting initial scenario...")
     await init_first_scenario()
+
+    # yield = Starting app
+    yield
+
+    # Cleanup (shutdown)
+    logger.info("Shutting down...")
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(admin.router, prefix="/v1", tags=["admin"])

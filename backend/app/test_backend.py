@@ -86,6 +86,26 @@ def main():
         print(f"An unexpected error occurred: {e}")
         return
 
+    # Roll dice for initiative
+    try:
+        resp = requests.post(f"{BASE_URL}/game/{game['id']}/roll_initiative")
+        resp.raise_for_status()
+        players = resp.json()
+        print("Rolled initiative for players:")
+        for player in players:
+            print(
+                f"- {player['display_name']} (Initiative: {player['initiative']}, Order: {player['order']})"
+            )
+    except requests.RequestException as e:
+        print(f"Error rolling initiative: {e}")
+        return
+    except KeyError:
+        print("Unexpected response format when rolling initiative.")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred when rolling initiative: {e}")
+        return
+
 
 if __name__ == "__main__":
     main()

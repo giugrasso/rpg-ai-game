@@ -166,6 +166,14 @@ async def delete_game(db: AsyncSession, game: Game) -> None:
     await db.commit()
 
 
+async def update_game(db: AsyncSession, game: Game) -> Game:
+    """Update a game's information in the database."""
+    db.add(game)
+    await db.commit()
+    await db.refresh(game)
+    return game
+
+
 # === Player CRUD operations ===
 
 
@@ -197,3 +205,21 @@ async def delete_player(db: AsyncSession, player: Player) -> None:
     """Delete a player from the database."""
     await db.delete(player)
     await db.commit()
+
+
+async def get_players_by_game(db: AsyncSession, game_id: UUID) -> Sequence[Player]:
+    """Retrieve all players for a specific game."""
+    result = await db.execute(
+        select(Player)
+        .where(Player.game_id == game_id)
+        .options(selectinload(Player.game))  # type: ignore
+    )
+    return result.scalars().all()
+
+
+async def update_player(db: AsyncSession, player: Player) -> Player:
+    """Update a player's information in the database."""
+    db.add(player)
+    await db.commit()
+    await db.refresh(player)
+    return player

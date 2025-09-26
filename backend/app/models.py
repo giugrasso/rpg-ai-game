@@ -56,6 +56,7 @@ class Game(SQLModel, table=True):
     scenario_id: UUID = Field(foreign_key="scenario.id")
     turn: int = 0
     active: bool = True
+    current_player_id: Optional[UUID]
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     last_updated: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
 
@@ -69,6 +70,8 @@ class Player(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     display_name: str
     role: str
+    turn_order: int = 0
+    alive: bool = True
     stats: Dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
     hp: float
     mp: float
@@ -87,6 +90,8 @@ class History(SQLModel, table=True):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
     action_type: str  # ex: "attack", "move", "heal"
     action_payload: Dict = Field(default_factory=dict, sa_column=Column(JSON))
+    success: Optional[bool] = None
+    result: Dict = Field(default_factory=dict, sa_column=Column(JSON))
 
     # Relations
     game: Game = Relationship(back_populates="history_entries")

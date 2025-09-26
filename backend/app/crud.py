@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import selectinload
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, asc, select
 
 from app.core.config import settings
 from app.models import (
@@ -247,6 +247,7 @@ async def get_history_by_game(db: AsyncSession, game_id: UUID) -> Sequence["Hist
     result = await db.execute(
         select(History)
         .where(History.game_id == game_id)
+        .order_by(asc(History.timestamp))
         .options(selectinload(History.player))  # type: ignore
     )
     return result.scalars().all()

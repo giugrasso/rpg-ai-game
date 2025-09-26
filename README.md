@@ -7,10 +7,11 @@ L’IA agit comme maître du jeu, se souvient des actions précédentes et adapt
 ---
 
 ## 🚀 Fonctionnalités (MVP)
+
 - 🎲 Création de personnage avec répartition de 20 points sur les attributs.
 - ⚔️ Mode **PvE** (joueurs coopèrent contre des ennemis contrôlés par l’IA).
 - 🛡️ Mode **PvP** (joueurs s’affrontent dans des factions différentes).
-- 🧠 IA (via Ollama, modèle `llama3.2:latest`) pour la narration et la résolution des actions.
+- 🧠 IA (via Ollama, modèle `deepseek-r1:14b`) pour la narration et la résolution des actions.
 - 🔄 Sauvegarde et reprise de parties (PostgreSQL).
 - ⚡ Gestion des états temps réel et des tours (Redis).
 - 🌐 Interface web (React + Bootstrap).
@@ -21,6 +22,7 @@ L’IA agit comme maître du jeu, se souvient des actions précédentes et adapt
 ## 🐳 Démarrage rapide avec Docker Compose
 
 ### 1. Cloner le projet
+
 ```bash
 git clone https://github.com/giugrasso/rpg-ai-game.git
 cd rpg-ai-game
@@ -38,9 +40,9 @@ docker compose up --watch
 
 ### 3. Accéder aux services
 
-* Frontend : [http://localhost:3000](http://localhost:3000)
-* Backend (FastAPI docs) : [http://localhost:8000/docs](http://localhost:8000/docs)
-* Ollama API : [http://localhost:11434](http://localhost:11434)
+- Frontend : [http://localhost:3000](http://localhost:3000)
+- Backend (FastAPI docs) : [http://localhost:8000/docs](http://localhost:8000/docs)
+- Ollama API : [http://localhost:11434](http://localhost:11434)
 
 ---
 
@@ -83,11 +85,11 @@ Consultez le fichier [CONTRIBUTING](CONTRIBUTING.md) pour plus de détails.
 
 ## 🧑‍💻 Roadmap
 
-* [ ] MVP jouable en mode solo (FastAPI + Ollama).
-* [ ] Gestion multijoueur (WebSocket).
-* [ ] Scénarios PvE et PvP.
-* [ ] Sauvegarde/chargement de parties.
-* [ ] Génération d’images pour immersion (V2).
+- [ ] MVP jouable en mode solo (FastAPI + Ollama).
+- [ ] Gestion multijoueur (WebSocket).
+- [ ] Scénarios PvE et PvP.
+- [ ] Sauvegarde/chargement de parties.
+- [ ] Génération d’images pour immersion (V2).
 
 ---
 

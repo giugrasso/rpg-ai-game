@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import requests
 
 BASE_URL = "http://localhost:8000/v1"
@@ -107,15 +105,15 @@ def main():
     except Exception as e:
         print(f"An unexpected error occurred when rolling initiative: {e}")
         return
-    
+
     # Play a turn
     try:
         resp = requests.post(f"{BASE_URL}/game/{game['id']}/turn")
         resp.raise_for_status()
         game_state = resp.json()
-        print(f"Turn played. Game is now in phase: {game_state['phase']}, Turn: {game_state['turn']}")
-
-        pprint(f"{game_state}")
+        print(
+            f"Turn played. Game is now in phase: {game_state['phase']}, Turn: {game_state['turn']}"
+        )
     except requests.RequestException as e:
         print(f"Error playing turn: {e}")
         return
@@ -125,30 +123,30 @@ def main():
     except Exception as e:
         print(f"An unexpected error occurred when playing turn: {e}")
         return
-    
+
     # Fetch game history
 
-    #TODO: Endpoint not implemented yet
+    # TODO: Endpoint not implemented yet
 
-    # try:
-    #     resp = requests.get(f"{BASE_URL}/game/{game['id']}/history")
-    #     resp.raise_for_status()
-    #     history = resp.json()
-    #     print("Game history entries:")
-    #     for entry in history:
-    #         print(
-    #             f"- [{entry['timestamp']}] {entry['action_type']} (Success: {entry['success']}) - Result: {entry['result']}"
-    #         )
-    # except requests.RequestException as e:
-    #     print(f"Error fetching game history: {e}")
-    #     return
-    # except KeyError:
-    #     print("Unexpected response format when fetching game history.")
-    #     return
-    # except Exception as e:
-    #     print(f"An unexpected error occurred when fetching game history: {e}")
-    #     return
-    
+    try:
+        resp = requests.get(f"{BASE_URL}/game/{game['id']}/history")
+        resp.raise_for_status()
+        history = resp.json()
+        print("Game history entries:")
+        for entry in history:
+            temp_msg = f"- [{entry['timestamp']}] {entry['action_type']} (Success: {entry['success']}) - \n\tResult: {entry['result']['narration']}"
+            for option in entry['result']['options']:
+                temp_msg += f"\n\tOption: {option}"
+            print(temp_msg)
+    except requests.RequestException as e:
+        print(f"Error fetching game history: {e}")
+        return
+    except KeyError:
+        print("Unexpected response format when fetching game history.")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred when fetching game history: {e}")
+        return
 
 
 if __name__ == "__main__":

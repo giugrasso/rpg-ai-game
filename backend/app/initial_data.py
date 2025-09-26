@@ -215,8 +215,8 @@ async def init_first_scenario():
                 ),
             ],
             context="""
-**Contexte connu des joueurs (à révéler progressivement) :**
-Vous venez de débarquer de nuit sur une île tropicale isolée, après avoir répondu à un appel de détresse lancé par une station de recherche scientifique.
+**Contexte connu des joueurs:**
+Vous venez de débarquer de nuit dans un petit port de pêcheur d'une île tropicale isolée de 20 km², après avoir répondu à un appel de détresse lancé par une station de recherche scientifique.
 Le message était incomplet, mais mentionnait une "urgence biologique" et une évacuation par héliport au centre de l'île.
 Votre mission initiale : localiser le Dr. George, le responsable de la station, et vous rendre à l'héliport pour une extraction d'urgence.
 

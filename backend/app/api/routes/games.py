@@ -76,6 +76,16 @@ async def roll_initiative(game_id: UUID, db: AsyncSession = Depends(get_session)
 
     return players
 
+@router.get("/game/{game_id}/history", response_model=list[models.History])
+async def get_game_history(game_id: UUID, db: AsyncSession = Depends(get_session)):
+    game = await crud.get_game(db, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    history_entries = await crud.get_history_by_game(db, game_id)
+    return history_entries
+
+
 
 @router.post("/game/{game_id}/turn", response_model=models.Game)
 async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
@@ -100,15 +110,12 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 )
 
             # Prompt qui permet de souhaiter la bienvenue aux joueurs (en donnant les détails des joueurs à l'IA) dans le scénario
-            prompt = f"Tu es une IA qui gère un jeu de rôle. Le scénario est le suivant : {scenario.context}.\n\n"
+            prompt = f"Le scénario est le suivant : {scenario.context}.\n\n"
             prompt += "Les joueurs sont : \n"
             for player in players:
                 prompt += f"\t{player.display_name}, un {player.role} avec {player.hp} points de vie et {player.mp} points de mana. \n"
-                prompt += f"\t\tLes statistiques de {player.display_name} sont : {player.stats}. \n"
-            prompt += "\n\nDécris la scène de manière immersive et engageante, en mettant en avant les détails importants. \n"
-            prompt += (
-                "Pose des questions aux joueurs pour les impliquer dans l'histoire.\n"
-            )
+                prompt += f"\t\tLes statistiques de {player.display_name} sont : {player.stats} et initiative {player.initiative}. \n"
+            prompt += "\n\nDécris la scène et ce que les joueurs voient, puis propose des options d'actions possibles au joueur en cours.\n"
             # Récupération du joueur avec l'initiative la plus haute
             actual_player = next(
                 (p for p in players if p.id == game.current_player_id), None)
@@ -119,7 +126,21 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             
             prompt += f"\nC'est le tour de {actual_player.display_name}, qui a l'initiative la plus haute. "
 
+
+
             print(f"Prompt pour l'IA : {prompt}")
+
+            # Enregistre l'entrée d'historique
+            history_entry = models.History(
+                game_id=game.id,
+                player_id=None,
+                action_type="narration",
+                action_payload={},
+                success=True,
+                result={"narration": prompt, "options": []},  # Options vides pour l'instant
+            )
+
+            await crud.create_history_entry(db, history_entry)
 
             client = AsyncClient(host=settings.OLLAMA_SERVER)
             response = await client.chat(
@@ -147,7 +168,7 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             # Enregistre l'entrée d'historique
             history_entry = models.History(
                 game_id=game.id,
-                player_id=None,
+                player_id=game.current_player_id,
                 action_type="narration",
                 action_payload={},
                 success=True,

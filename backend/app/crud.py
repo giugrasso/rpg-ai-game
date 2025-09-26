@@ -10,6 +10,7 @@ from app.models import (
     AIModel,
     CharacterRoleSchema,
     Game,
+    History,
     Player,
     Scenario,
     ScenarioRole,
@@ -155,7 +156,12 @@ async def create_game(db: AsyncSession, game: Game) -> Game:
 async def get_game(db: AsyncSession, game_id: UUID) -> Game | None:
     """Retrieve a game by its ID."""
     result = await db.execute(
-        select(Game).where(Game.id == game_id).options(selectinload(Game.scenario))  # type: ignore
+        select(Game)
+        .where(Game.id == game_id)
+        .options(
+            selectinload(Game.players),  # type: ignore
+            selectinload(Game.scenario),  # type: ignore
+        )
     )
     return result.scalars().first()
 
@@ -223,3 +229,36 @@ async def update_player(db: AsyncSession, player: Player) -> Player:
     await db.commit()
     await db.refresh(player)
     return player
+
+
+# === History CRUD operations ===
+
+
+async def create_history_entry(db: AsyncSession, history_entry: "History") -> "History":
+    """Create a new history entry in the database."""
+    db.add(history_entry)
+    await db.commit()
+    await db.refresh(history_entry)
+    return history_entry
+
+
+async def get_history_by_game(db: AsyncSession, game_id: UUID) -> Sequence["History"]:
+    """Retrieve all history entries for a specific game."""
+    result = await db.execute(
+        select(History)
+        .where(History.game_id == game_id)
+        .options(selectinload(History.player))  # type: ignore
+    )
+    return result.scalars().all()
+
+
+async def get_history_by_player(
+    db: AsyncSession, player_id: UUID
+) -> Sequence["History"]:
+    """Retrieve all history entries for a specific player."""
+    result = await db.execute(
+        select(History)
+        .where(History.player_id == player_id)
+        .options(selectinload(History.game))  # type: ignore
+    )
+    return result.scalars().all()

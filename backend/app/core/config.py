@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     PROJECT_VERSION: str = "0.0.1"
 
     OLLAMA_SERVER: str = "http://ollama:11434"
-    OLLAMA_MODEL: str = "gpt-oss:20b"
+    OLLAMA_MODEL: str = "deepseek-r1:14b"
 
     POSTGRES_SERVER: str = "db"  # docker compose service name
     POSTGRES_PORT: int = 5432

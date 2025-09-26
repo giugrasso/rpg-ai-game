@@ -136,3 +136,9 @@ class GameSchema(BaseModel):
     scenario_id: UUID
     turn: int = 0
     active: bool = True
+
+
+class AIWelcomeResponseSchema(BaseModel):
+    welcome_message: str
+    scenario_description: str
+    player_roles: List[CharacterRoleSchema]

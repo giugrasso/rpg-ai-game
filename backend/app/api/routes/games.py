@@ -87,6 +87,84 @@ async def get_game_history(game_id: UUID, db: AsyncSession = Depends(get_session
     return history_entries
 
 
+@router.post("/game/{game_id}/player_turn", response_model=models.Game)
+async def play_player_turn(
+    game_id: UUID,
+    turn_data: models.PlayerTurnSchema,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Joue un tour pour le joueur en cours, en fonction de l'option choisie.
+    """
+    game = await crud.get_game(db, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game.phase != models.Phase.PLAYER:
+        raise HTTPException(status_code=400, detail="It's not the player's turn")
+
+    players = game.players
+    actual_player = next((p for p in players if p.id == game.current_player_id), None)
+
+    if actual_player is None:
+        raise HTTPException(status_code=500, detail="Current player not found")
+
+    # Récupérer l'option choisie
+    option_id = turn_data.option_id
+
+    # On récupère la description de l'option choisie dans l'historique
+    history_entries = await crud.get_history_by_game(db, game_id)
+    option_description = None
+    for entry in reversed(history_entries):
+        if (
+            entry.player_id == actual_player.id
+            and entry.action_role == models.ChatRole.ASSISTANT
+        ):
+            options = entry.result.get("options", [])
+            for option in options:
+                if option.get("id") == option_id:
+                    option_description = option.get("description")
+                    break
+        if option_description:
+            break
+
+    if not option_description:
+        raise HTTPException(status_code=400, detail="Invalid option selected")
+
+    print(
+        f"Player {actual_player.display_name} selected option {option_id}: {option_description}"
+    )
+
+    # On place l'option choisie dans l'historique
+    history_entry = models.History(
+        game_id=game.id,
+        player_id=actual_player.id,
+        action_role=models.ChatRole.USER,
+        success=True,
+        result={
+            "narration": f"{actual_player.display_name} choisit l'option {option_id}: {option_description}",
+            "options": [],
+        },
+    )
+
+    await crud.create_history_entry(db, history_entry)
+    # On passe le tour à l'IA
+    game.phase = models.Phase.AI
+
+    # On passe au joueur suivant
+    players_sorted = sorted(players, key=lambda p: p.order)
+    current_index = next(
+        (i for i, p in enumerate(players_sorted) if p.id == actual_player.id), None
+    )
+    if current_index is not None:
+        next_index = (current_index + 1) % len(players_sorted)
+        game.current_player_id = players_sorted[next_index].id
+
+    await crud.update_game(db, game)
+
+    return game
+
+
 @router.post("/game/{game_id}/ai_turn", response_model=models.Game)
 async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
     """
@@ -132,8 +210,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             history_entry = models.History(
                 game_id=game.id,
                 player_id=None,
-                action_type="narration",
-                action_payload={},
+                action_role=models.ChatRole.USER,
                 success=True,
                 result={
                     "narration": prompt,
@@ -170,8 +247,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             history_entry = models.History(
                 game_id=game.id,
                 player_id=game.current_player_id,
-                action_type="narration",
-                action_payload={},
+                action_role=models.ChatRole.ASSISTANT,
                 success=True,
                 result=ai_message.model_dump(),
             )

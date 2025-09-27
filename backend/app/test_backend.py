@@ -1,3 +1,5 @@
+from random import randint
+
 import requests
 
 BASE_URL = "http://localhost:8000/v1"
@@ -107,26 +109,34 @@ def main():
         return
 
     # Play a turn
-    try:
-        resp = requests.post(f"{BASE_URL}/game/{game['id']}/ai_turn")
-        resp.raise_for_status()
-        game_state = resp.json()
-        print(
-            f"Turn played. Game is now in phase: {game_state['phase']}, Turn: {game_state['turn']}"
-        )
-    except requests.RequestException as e:
-        print(f"Error playing turn: {e}")
-        return
-    except KeyError:
-        print("Unexpected response format when playing turn.")
-        return
-    except Exception as e:
-        print(f"An unexpected error occurred when playing turn: {e}")
-        return
+    ai_play_success: bool = False
+    ai_play_success_retry_count: int = 0
+
+    while not ai_play_success and ai_play_success_retry_count < 5:
+        try:
+            resp = requests.post(f"{BASE_URL}/game/{game['id']}/ai_turn")
+            resp.raise_for_status()
+            game_state = resp.json()
+            print(
+                f"Turn played. Game is now in phase: {game_state['phase']}, Turn: {game_state['turn']}"
+            )
+            ai_play_success = True
+        except requests.RequestException as e:
+            print(f"Error playing turn: {e}")
+            print("Retrying AI turn...")
+        except KeyError:
+            print("Unexpected response format when playing turn.")
+            print("Retrying AI turn...")
+        except Exception as e:
+            print(f"An unexpected error occurred when playing turn: {e}")
+            print("Retrying AI turn...")
+
+    else:
+        if not ai_play_success:
+            print("Failed to play AI turn after multiple attempts. Exiting.")
+            return
 
     # Fetch game history
-
-    # TODO: Endpoint not implemented yet
 
     try:
         resp = requests.get(f"{BASE_URL}/game/{game['id']}/history")
@@ -134,8 +144,67 @@ def main():
         history = resp.json()
         print("Game history entries:")
         for entry in history:
-            temp_msg = f"- [{entry['timestamp']}] {entry['action_type']} (Success: {entry['success']}) - \n\tResult: {entry['result']['narration']}"
-            for option in entry['result']['options']:
+            temp_msg = f"- [{entry['timestamp']}] {entry['action_role']} (Success: {entry['success']}) - \n\tResult: {entry['result']['narration']}"
+            for option in entry["result"]["options"]:
+                temp_msg += f"\n\tOption: {option}"
+            print(temp_msg)
+    except requests.RequestException as e:
+        print(f"Error fetching game history: {e}")
+        return
+    except KeyError:
+        print("Unexpected response format when fetching game history.")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred when fetching game history: {e}")
+        return
+
+    # Choix d'une option au hasard parmi les options proposées par l'IA
+    try:
+        if (
+            history
+            and "options" in history[-1]["result"]
+            and history[-1]["result"]["options"]
+        ):
+            options = history[-1]["result"]["options"]
+
+            # pick a random option
+
+            chosen_option = randint(0, len(options) - 1)
+
+            print(f"Chosen option: {chosen_option}")
+            print(f"Option details: {options[chosen_option]}")
+
+            resp = requests.post(
+                f"{BASE_URL}/game/{game['id']}/player_turn",
+                json={"option_id": options[chosen_option]["id"]},
+            )
+            resp.raise_for_status()
+            game_state = resp.json()
+            print(
+                f"Player turn played. Game is now in phase: {game_state['phase']}, Turn: {game_state['turn']}"
+            )
+        else:
+            print("No options available to choose from.")
+    except requests.RequestException as e:
+        print(f"Error playing player turn: {e}")
+        return
+    except KeyError:
+        print("Unexpected response format when playing player turn.")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred when playing player turn: {e}")
+        return
+
+    # Fetch game history
+
+    try:
+        resp = requests.get(f"{BASE_URL}/game/{game['id']}/history")
+        resp.raise_for_status()
+        history = resp.json()
+        print("Game history entries:")
+        for entry in history:
+            temp_msg = f"- [{entry['timestamp']}] {entry['action_role']} (Success: {entry['success']}) - \n\tResult: {entry['result']['narration']}"
+            for option in entry["result"]["options"]:
                 temp_msg += f"\n\tOption: {option}"
             print(temp_msg)
     except requests.RequestException as e:

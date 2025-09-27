@@ -89,15 +89,19 @@ class Player(SQLModel, table=True):
     game: Optional[Game] = Relationship(back_populates="players")
     history_entries: List["History"] = Relationship(back_populates="player")
 
+class ChatRole(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+
 
 class History(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     game_id: UUID = Field(foreign_key="game.id")
     player_id: Optional[UUID] = Field(default=None, foreign_key="player.id")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(tz.utc))
-    action_type: str  # ex: "attack", "move", "heal"
-    action_payload: Dict = Field(default_factory=dict, sa_column=Column(JSON))
-    success: Optional[bool] = None
+    action_role: ChatRole
+    success: bool = True
     result: Dict = Field(default_factory=dict, sa_column=Column(JSON))
 
     # Relations
@@ -148,3 +152,6 @@ class GameSchema(BaseModel):
     scenario_id: UUID
     turn: int = 0
     active: bool = True
+
+class PlayerTurnSchema(BaseModel):
+    option_id: int

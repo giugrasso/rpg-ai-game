@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import admin, ai_actions, ai_models, games, players, scenarios
+from app.api.routes import admin, ai_models, games, players, scenarios
 from app.core.db import init_db
 from app.initial_data import init_first_scenario, init_game_master
 
@@ -37,4 +37,3 @@ app.include_router(ai_models.router, prefix="/v1", tags=["aimodels"])
 app.include_router(scenarios.router, prefix="/v1", tags=["scenarios"])
 app.include_router(games.router, prefix="/v1", tags=["games"])
 app.include_router(players.router, prefix="/v1", tags=["players"])
-app.include_router(ai_actions.router, prefix="/v1", tags=["ai_actions"])

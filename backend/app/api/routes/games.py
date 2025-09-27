@@ -87,8 +87,8 @@ async def get_game_history(game_id: UUID, db: AsyncSession = Depends(get_session
     return history_entries
 
 
-@router.post("/game/{game_id}/turn", response_model=models.Game)
-async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
+@router.post("/game/{game_id}/ai_turn", response_model=models.Game)
+async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
     """
     Joue un tour : soit l'IA parle (si c'est son tour), soit le joueur exécute une action.
     """
@@ -181,14 +181,7 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             game.phase = models.Phase.PLAYER
             await crud.update_game(db, game)
 
-        elif game.phase == models.Phase.PLAYER:
-            # C'est le tour du joueur
-            actual_player = next(
-                (p for p in players if p.id == game.current_player_id), None
-            )
-            if actual_player is None:
-                raise HTTPException(status_code=500, detail="Current player not found")
-
-            
-
         return game
+
+    else:
+        raise HTTPException(status_code=400, detail="It's not the AI's turn")

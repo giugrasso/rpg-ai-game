@@ -108,7 +108,7 @@ def main():
 
     # Play a turn
     try:
-        resp = requests.post(f"{BASE_URL}/game/{game['id']}/turn")
+        resp = requests.post(f"{BASE_URL}/game/{game['id']}/ai_turn")
         resp.raise_for_status()
         game_state = resp.json()
         print(

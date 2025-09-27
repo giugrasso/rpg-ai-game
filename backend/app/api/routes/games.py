@@ -76,6 +76,7 @@ async def roll_initiative(game_id: UUID, db: AsyncSession = Depends(get_session)
 
     return players
 
+
 @router.get("/game/{game_id}/history", response_model=list[models.History])
 async def get_game_history(game_id: UUID, db: AsyncSession = Depends(get_session)):
     game = await crud.get_game(db, game_id)
@@ -84,7 +85,6 @@ async def get_game_history(game_id: UUID, db: AsyncSession = Depends(get_session
 
     history_entries = await crud.get_history_by_game(db, game_id)
     return history_entries
-
 
 
 @router.post("/game/{game_id}/turn", response_model=models.Game)
@@ -115,18 +115,16 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             for player in players:
                 prompt += f"\t{player.display_name}, un {player.role} avec {player.hp} points de vie et {player.mp} points de mana. \n"
                 prompt += f"\t\tLes statistiques de {player.display_name} sont : {player.stats} et initiative {player.initiative}. \n"
-            prompt += "\n\nDécris la scène et ce que les joueurs voient, puis propose des options d'actions possibles au joueur en cours.\n"
+            prompt += "\n\nSouhaite la **bienvenue aux joueurs** en **introduisant le scénario** et en **rappelant aux joueurs pourquoi ils sont là**, décris la scène en donnant les infos d'où les joueurs sont et ce que les joueurs voient, puis propose des options d'actions possibles au joueur en cours.\n"
             # Récupération du joueur avec l'initiative la plus haute
             actual_player = next(
-                (p for p in players if p.id == game.current_player_id), None)
-            
+                (p for p in players if p.id == game.current_player_id), None
+            )
+
             if actual_player is None:
-                raise HTTPException(
-                    status_code=500, detail="Current player not found")
-            
+                raise HTTPException(status_code=500, detail="Current player not found")
+
             prompt += f"\nC'est le tour de {actual_player.display_name}, qui a l'initiative la plus haute. "
-
-
 
             print(f"Prompt pour l'IA : {prompt}")
 
@@ -137,7 +135,10 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 action_type="narration",
                 action_payload={},
                 success=True,
-                result={"narration": prompt, "options": []},  # Options vides pour l'instant
+                result={
+                    "narration": prompt,
+                    "options": [],
+                },  # Options vides pour l'instant
             )
 
             await crud.create_history_entry(db, history_entry)
@@ -176,9 +177,18 @@ async def play_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             )
 
             await crud.create_history_entry(db, history_entry)
-            # Passe au tour du joueur
             game.turn += 1
             game.phase = models.Phase.PLAYER
             await crud.update_game(db, game)
 
-            return game
+        elif game.phase == models.Phase.PLAYER:
+            # C'est le tour du joueur
+            actual_player = next(
+                (p for p in players if p.id == game.current_player_id), None
+            )
+            if actual_player is None:
+                raise HTTPException(status_code=500, detail="Current player not found")
+
+            
+
+        return game

@@ -271,10 +271,13 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                     if entry == history_entries[-1]:
                         if not game.scenario:
                             raise HTTPException(
-                                status_code=404, detail="Scenario not found for this game"
+                                status_code=404,
+                                detail="Scenario not found for this game",
                             )
                         content += "\n\nTon rôle est de diriger une aventure interactive avec exploration, énigmes et combats obligatoires. N'évites jamais un conflit ou un combat, au contraire, rends-les épiques et engageants. Sois descriptif dans tes narrations pour immerger les joueurs dans l'univers. Propose toujours des options d'actions variées et intéressantes, en lien avec le contexte et les personnages des joueurs."
-                        content += f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
+                        content += (
+                            f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
+                        )
                         content += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
                     messages.append({"role": role, "content": content})
 
@@ -300,12 +303,26 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                     status_code=500,
                     detail=f"Invalid response format from AI: {e}",
                 )
-            
+
             # On vérifie que les options ne sont pas vides
             if not ai_message.options:
                 raise HTTPException(
                     status_code=500,
                     detail="AI response contains no options, which is invalid.",
+                )
+            
+            print(f"{ai_message.narration.lower()=}")
+            print(f"{history_entries[-1].result.get('narration', '').lower()=}")
+
+            # Si l'IA répète la même narration que la dernière fois, on considère que c'est une erreur
+            if (
+                history_entries
+                and ai_message.narration.lower()
+                == history_entries[-1].result.get("narration", "").lower()
+            ):
+                raise HTTPException(
+                    status_code=500,
+                    detail="AI response narration is identical to the last one, which is invalid.",
                 )
 
             print(f"Réponse de l'IA : {ai_message}")

@@ -273,6 +273,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                             raise HTTPException(
                                 status_code=404, detail="Scenario not found for this game"
                             )
+                        content += "\n\nTon rôle est de diriger une aventure interactive avec exploration, énigmes et combats obligatoires."
                         content += f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
                         content += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
                     messages.append({"role": role, "content": content})

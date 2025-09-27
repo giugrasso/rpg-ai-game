@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     PROJECT_VERSION: str = "0.0.1"
 
     OLLAMA_SERVER: str = "http://ollama:11434"
-    OLLAMA_MODEL: str = "deepseek-r1:14b" # Exploration (évite les combats et les conflits)
-    # OLLAMA_MODEL: str = "huihui_ai/deepseek-r1-abliterated:14b" # Uncensored (plus de combats et de conflits)
+    # OLLAMA_MODEL: str = "deepseek-r1:14b" # Exploration (évite les combats et les conflits)
+    OLLAMA_MODEL: str = "gpt-oss:20b" # Version open source de GPT-4 (plus de combats et de conflits)
 
     POSTGRES_SERVER: str = "db"  # docker compose service name
     POSTGRES_PORT: int = 5432

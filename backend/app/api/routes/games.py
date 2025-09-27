@@ -193,6 +193,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 prompt += f"\t{player.display_name}, un {player.role} avec {player.hp} points de vie et {player.mp} points de mana. \n"
                 prompt += f"\t\tLes statistiques de {player.display_name} sont : {player.stats} et initiative {player.initiative}. \n"
             prompt += "\n\nSouhaite la **bienvenue aux joueurs** en **introduisant le scénario** et en **rappelant aux joueurs pourquoi ils sont là**, décris la scène en donnant les infos d'où les joueurs sont et ce que les joueurs voient, puis propose des options d'actions possibles au joueur en cours.\n"
+            prompt += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
             # Récupération du joueur avec l'initiative la plus haute
             actual_player = next(
                 (p for p in players if p.id == game.current_player_id), None
@@ -224,7 +225,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 model="game_master",
                 messages=[{"role": models.ChatRole.USER, "content": prompt}],
                 stream=False,
-                format=models.AIResponseValidator.model_json_schema(),
+                # format=models.AIResponseValidator.model_json_schema(),
             )
 
             print(f"Réponse brute de l'IA : {response}")
@@ -288,7 +289,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 model="game_master",
                 messages=messages,
                 stream=False,
-                format=models.AIResponseValidator.model_json_schema(),
+                # format=models.AIResponseValidator.model_json_schema(),
             )
 
             print(f"Réponse brute de l'IA : {response}")

@@ -32,15 +32,14 @@ def play_ai_turn(game_id: str) -> dict | None:
     return None
 
 
-def play_player_turn(game_id: str, options: list[dict]) -> dict | None:
+def play_player_turn(game_id: str, option: dict) -> dict | None:
     """Choisit une option aléatoire et joue un tour joueur."""
-    chosen_option = randint(0, len(options) - 1)
-    print(f"🎲 Player chose option {chosen_option}: {options[chosen_option]}")
+    
 
     return safe_request(
         "POST",
         f"{BASE_URL}/game/{game_id}/player_turn",
-        json={"option_id": options[chosen_option]["id"]},
+        json={"option_id": option["id"]},
     )
 
 
@@ -51,6 +50,8 @@ def print_last_history(game_id: str):
         return
 
     entry = history[-1]
+
+    # print(f"🕒 Latest history entry: {entry}")
     narration = entry["result"].get("narration", "")
     options = entry["result"].get("options", [])
 
@@ -146,7 +147,10 @@ def main():
             print("⚠️ No options available, game may be over.")
             break
 
-        game_state = play_player_turn(game_id, options)
+        chosen_option = randint(0, len(options) - 1)
+        # print(f"🎲 Player chose option {chosen_option}: {options[chosen_option]}")
+
+        game_state = play_player_turn(game_id, options[chosen_option])
         if not game_state:
             break
         print_last_history(game_id)

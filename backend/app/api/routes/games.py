@@ -114,18 +114,17 @@ async def play_player_turn(
 
     # On récupère la description de l'option choisie dans l'historique
     history_entries = await crud.get_history_by_game(db, game_id)
+    if not history_entries:
+        raise HTTPException(status_code=404, detail="No history found for this game")
+
+    last_entry = history_entries[-1]
+
+    options = last_entry.result.get("options", [])
     option_description = None
-    for entry in reversed(history_entries):
-        if (
-            entry.player_id == actual_player.id
-            and entry.action_role == models.ChatRole.ASSISTANT
-        ):
-            options = entry.result.get("options", [])
-            for option in options:
-                if option.get("id") == option_id:
-                    option_description = option.get("description")
-                    break
-        if option_description:
+
+    for option in options:
+        if option.get("id") == option_id:
+            option_description = option.get("description")
             break
 
     if not option_description:
@@ -142,7 +141,7 @@ async def play_player_turn(
         action_role=models.ChatRole.USER,
         success=True,
         result={
-            "narration": f"{actual_player.display_name} choisit l'option {option_id}: {option_description}",
+            "narration": f"{actual_player.display_name} choisit l'option {option_id}: {option_description}.",
             "options": [],
         },
     )
@@ -255,6 +254,80 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             await crud.create_history_entry(db, history_entry)
             game.turn += 1
             game.phase = models.Phase.PLAYER
+            await crud.update_game(db, game)
+
+        else:
+            # Ce n'est pas le tour 0
+            # On récupère l'historique pour "messages" à envoyer à l'IA
+            # On ajoute l'ordre de répondre au format attendu par l'IA (dernier message = ordre)
+
+            history_entries = await crud.get_history_by_game(db, game_id)
+            messages = []
+            for entry in history_entries:
+                role = entry.action_role
+                content = entry.result.get("narration", "")
+                if content:
+                    # Si c'est le dernier message, on insiste pour que l'IA réponde au format attendu
+                    if entry == history_entries[-1]:
+                        content += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
+                    messages.append({"role": role, "content": content})
+
+            print(f"Messages pour l'IA : {messages}")
+
+            client = AsyncClient(host=settings.OLLAMA_SERVER)
+            response = await client.chat(
+                model="game_master",
+                messages=messages,
+                stream=False,
+                format=models.AIResponseValidator.model_json_schema(),
+            )
+
+            print(f"Réponse brute de l'IA : {response}")
+
+            # Valide la réponse de l'IA
+            try:
+                ai_message = models.AIResponseValidator.model_validate_json(
+                    response["message"]["content"]
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Invalid response format from AI: {e}",
+                )
+
+            print(f"Réponse de l'IA : {ai_message}")
+
+            # Enregistre l'entrée d'historique
+            history_entry = models.History(
+                game_id=game.id,
+                player_id=game.current_player_id,
+                action_role=models.ChatRole.ASSISTANT,
+                success=True,
+                result=ai_message.model_dump(),
+            )
+
+            await crud.create_history_entry(db, history_entry)
+
+            game.turn += 1
+            game.phase = models.Phase.PLAYER
+
+            # On passe au joueur suivant
+            players_sorted = sorted(players, key=lambda p: p.order)
+            actual_player = next(
+                (p for p in players_sorted if p.id == game.current_player_id), None
+            )
+
+            if actual_player is None:
+                raise HTTPException(status_code=500, detail="Current player not found")
+
+            current_index = next(
+                (i for i, p in enumerate(players_sorted) if p.id == actual_player.id),
+                None,
+            )
+            if current_index is not None:
+                next_index = (current_index + 1) % len(players_sorted)
+                game.current_player_id = players_sorted[next_index].id
+
             await crud.update_game(db, game)
 
         return game

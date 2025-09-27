@@ -299,6 +299,13 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                     status_code=500,
                     detail=f"Invalid response format from AI: {e}",
                 )
+            
+            # On vérifie que les options ne sont pas vides
+            if not ai_message.options:
+                raise HTTPException(
+                    status_code=500,
+                    detail="AI response contains no options, which is invalid.",
+                )
 
             print(f"Réponse de l'IA : {ai_message}")
 

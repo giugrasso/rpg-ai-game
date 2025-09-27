@@ -223,7 +223,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             client = AsyncClient(host=settings.OLLAMA_SERVER)
             response = await client.chat(
                 model="game_master",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": models.ChatRole.USER, "content": prompt}],
                 stream=False,
                 format=models.AIResponseValidator.model_json_schema(),
             )

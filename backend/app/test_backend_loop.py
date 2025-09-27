@@ -1,3 +1,4 @@
+import argparse
 import time
 from random import randint
 
@@ -34,7 +35,6 @@ def play_ai_turn(game_id: str) -> dict | None:
 
 def play_player_turn(game_id: str, option: dict) -> dict | None:
     """Choisit une option aléatoire et joue un tour joueur."""
-    
 
     return safe_request(
         "POST",
@@ -65,6 +65,22 @@ def print_last_history(game_id: str):
 
 
 def main():
+    # Vérifier la présence de l'argument --playable
+    parser = argparse.ArgumentParser(description="Test RPG AI Game Backend")
+    parser.add_argument(
+        "--playable",
+        action="store_true",
+        help="If set, the script will wait player turns. Otherwise, random option will be picked.",
+    )
+
+    print("🎲 RPG AI Game Test Script")
+
+    wait_for_player = False
+
+    if parser.parse_args().playable:
+        wait_for_player = True
+        print("⚠️ Running in PLAYABLE mode. Waiting for user input on player turns.")
+
     # === Setup game ===
     scenarios = safe_request("GET", f"{BASE_URL}/scenarios")
     if not scenarios:
@@ -147,7 +163,21 @@ def main():
             print("⚠️ No options available, game may be over.")
             break
 
-        chosen_option = randint(0, len(options) - 1)
+        if wait_for_player:
+            print("➡️ Waiting for player to choose an option...")
+            chosen_option = None
+            while chosen_option is None:
+                user_input = input(f"Choose an option (1-{len(options)}): ").strip()
+                if user_input.isdigit():
+                    idx = int(user_input) - 1
+                    if 0 <= idx < len(options):
+                        chosen_option = idx
+                    else:
+                        print("❌ Invalid option index.")
+                else:
+                    print("❌ Please enter a valid number.")
+        else:
+            chosen_option = randint(0, len(options) - 1)
         # print(f"🎲 Player chose option {chosen_option}: {options[chosen_option]}")
 
         game_state = play_player_turn(game_id, options[chosen_option])

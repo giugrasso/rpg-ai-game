@@ -143,6 +143,29 @@ async def init_game_master():
                 )
                 resp.raise_for_status()
                 model.installed = True
+
+                # run model
+                requests.post(
+                    f"{settings.OLLAMA_SERVER}/api/generate",
+                    json={"model": "game_master", "prompt": "Bonjour"},
+                )
+                resp.raise_for_status()
+
+                # Check if model is running
+                ollama_ps = requests.get(f"{settings.OLLAMA_SERVER}/api/ps")
+                ollama_ps.raise_for_status()
+
+                logger.info(f"Ollama ps: {ollama_ps.json()}")
+
+                # check if "game_master" is present in ollama_ps.json().get("models", [])
+                if "game_master" not in [
+                    m.get("name") for m in ollama_ps.json().get("models", [])
+                ]:
+                    raise Exception("Custom Ollama model is not running.")
+
+                logger.info("Custom Ollama model created and running.")
+
+                # Sauvegarde dans la BDD
                 session.add(model)
                 await session.commit()
                 await session.refresh(model)

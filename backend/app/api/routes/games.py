@@ -269,6 +269,11 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 if content:
                     # Si c'est le dernier message, on insiste pour que l'IA réponde au format attendu
                     if entry == history_entries[-1]:
+                        if not game.scenario:
+                            raise HTTPException(
+                                status_code=404, detail="Scenario not found for this game"
+                            )
+                        content += f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
                         content += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
                     messages.append({"role": role, "content": content})
 

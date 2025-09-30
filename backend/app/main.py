@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, debug=True, title="RPG AI Game API", version="0.0.1")
 
 
 app.include_router(admin.router, prefix="/v1", tags=["admin"])

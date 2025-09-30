@@ -1,3 +1,4 @@
+import ast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -173,6 +174,36 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
 
+    json_exemple = models.AIResponseValidator(
+        narration="Vous entrez dans une taverne sombre et enfumée, où l'odeur de la bière et du bois vieilli emplit l'air. Au fond de la pièce, un groupe de mercenaires discute à voix basse autour d'une table. Ils semblent nerveux, jetant des regards furtifs vers la porte.",
+        options=[
+            models.Option(
+                id=1,
+                description="Vous vous approchez du groupe de mercenaires et demandez s'ils ont besoin d'aide.",
+                success_rate=0.7,
+                health_point_change=0.0,
+                mana_point_change=0.0,
+                related_stat="courage",
+            ),
+            models.Option(
+                id=2,
+                description="Vous décidez de rester à l'écart et d'observer le groupe pour en apprendre plus sur eux.",
+                success_rate=0.5,
+                health_point_change=0.0,
+                mana_point_change=0.0,
+                related_stat="intelligence",
+            ),
+            models.Option(
+                id=3,
+                description="Vous commandez une boisson au bar et essayez de vous mêler aux autres clients pour recueillir des informations.",
+                success_rate=0.6,
+                health_point_change=0.0,
+                mana_point_change=0.0,
+                related_stat="charisme",
+            ),
+        ],
+    )
+
     players = game.players
 
     if game.phase == "AI":
@@ -193,7 +224,10 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                 prompt += f"\t{player.display_name}, un {player.role} avec {player.hp} points de vie et {player.mp} points de mana. \n"
                 prompt += f"\t\tLes statistiques de {player.display_name} sont : {player.stats} et initiative {player.initiative}. \n"
             prompt += "\n\nSouhaite la **bienvenue aux joueurs** en **introduisant le scénario** et en **rappelant aux joueurs pourquoi ils sont là**, décris la scène en donnant les infos d'où les joueurs sont et ce que les joueurs voient, puis propose des options d'actions possibles au joueur en cours.\n"
-            prompt += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
+            prompt += f"\n\nRéponds en français strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
+
+            # prompt += f"\n\nVoici un exemple de réponse au format JSON attendu:\n{json_exemple.model_dump()}\n\n"
+
             # Récupération du joueur avec l'initiative la plus haute
             actual_player = next(
                 (p for p in players if p.id == game.current_player_id), None
@@ -279,7 +313,10 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                         content += (
                             f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
                         )
-                        content += f"\n\nRéponds strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
+                        content += f"\n\nRéponds en français strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
+                        content += "\n\nN'utilise que des doubles quotes \" pour les clés et les valeurs.\n\n"
+                        content += f"\n\nVoici un exemple de réponse au format JSON attendu:\n{json_exemple.model_dump()}\n\n"
+
                     messages.append({"role": role, "content": content})
 
             print(f"Messages pour l'IA : {messages}")
@@ -293,25 +330,23 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             )
 
             print(f"Réponse brute de l'IA : {response}")
-
-            # Valide la réponse de l'IA
-            try:
-                ai_message = models.AIResponseValidator.model_validate_json(
-                    response["message"]["content"]
-                )
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Invalid response format from AI: {e}",
-                )
-
-            # On vérifie que les options ne sont pas vides
-            if not ai_message.options:
-                raise HTTPException(
-                    status_code=500,
-                    detail="AI response contains no options, which is invalid.",
-                )
             
+            # Valide la réponse de l'IA
+            raw = response["message"]["content"]
+            try:
+                # tentative JSON classique
+                ai_message = models.AIResponseValidator.model_validate_json(raw)
+            except Exception:
+                try:
+                    # tentative fallback : parser comme dict Python
+                    parsed = ast.literal_eval(raw)  # sécurise un peu l’éval
+                    ai_message = models.AIResponseValidator.model_validate(parsed)
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Invalid response format from AI (after fallback): {e}\nRaw: {raw}",
+                    )
+
             print(f"{ai_message.narration.lower()=}")
             print(f"{history_entries[-1].result.get('narration', '').lower()=}")
 

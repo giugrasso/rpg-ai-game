@@ -5,15 +5,23 @@ from random import randint
 import requests
 
 BASE_URL = "http://localhost:8000/v1"
-MAX_AI_RETRIES = 5
+MAX_AI_RETRIES = 10
 
 
 def safe_request(method, url, **kwargs):
     """Helper pour simplifier les requêtes HTTP avec gestion des erreurs."""
+    resp = None
     try:
         resp = requests.request(method, url, **kwargs)
         resp.raise_for_status()
         return resp.json()
+    except requests.HTTPError as http_err:
+        try:
+            error_detail = resp.json()  # type: ignore # FastAPI renvoie du JSON avec "detail"
+        except Exception:
+            error_detail = resp.text if resp else 'No details'  # fallback si pas du JSON
+        print(f"❌ HTTP error ({method} {url}): {http_err}\nDetails: {error_detail}")
+        return None
     except Exception as e:
         print(f"❌ Request error ({method} {url}): {e}")
         return None

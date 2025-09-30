@@ -122,17 +122,30 @@ async def play_player_turn(
 
     options = last_entry.result.get("options", [])
     option_description = None
+    option_success_rate = None
 
     for option in options:
         if option.get("id") == option_id:
             option_description = option.get("description")
+            option_success_rate = option.get("success_rate", 1.0)
             break
 
     if not option_description:
         raise HTTPException(status_code=400, detail="Invalid option selected")
+    
+    if option_success_rate is None:
+        raise HTTPException(status_code=400, detail="Option success rate not found")
+    
+    # Calculer le succès de l'option choisie
+    success = True
+    from random import randint
+
+    roll = randint(1, 100)
+    option_success_rate = int(option_success_rate * 100)  # Convert to percentage
+    success = roll <= option_success_rate
 
     print(
-        f"Player {actual_player.display_name} selected option {option_id}: {option_description}"
+        f"Player {actual_player.display_name} selected option {option_id}: {option_description} (roll={roll}, success_rate={option_success_rate}, success={success})"
     )
 
     # On place l'option choisie dans l'historique
@@ -142,7 +155,7 @@ async def play_player_turn(
         action_role=models.ChatRole.USER,
         success=True,
         result={
-            "narration": f"{actual_player.display_name} choisit l'option {option_id}: {option_description}.",
+            "narration": f"{actual_player.display_name} choisit l'option {option_id}: {option_description}. {"C'est un succès !" if success else "Malheureusement, C'est un échec..."}",
             "options": [],
         },
     )

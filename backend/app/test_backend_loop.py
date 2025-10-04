@@ -151,9 +151,25 @@ def main():
                 f"- {p['display_name']} (initiative={p['initiative']}, order={p['order']})"
             )
 
+    
+
     # === Game loop ===
     print("\n🚀 Starting game loop...\n")
     while True:
+        game = safe_request("GET", f"{BASE_URL}/game/{game_id}")
+        if game is None:
+            return
+        
+        actual_turn = game.get("actual_turn", -1)
+        successed_turns = game.get("successed_turns", -1)
+        max_successed_turns = game.get("max_successed_turns", -1)
+
+        progression_percents: float = (
+                float(successed_turns) / float(max_successed_turns)
+            ) * 100.0
+        
+        print(f"🔄 Starting turn {actual_turn} (Les joueurs sont à {progression_percents:.1f}% de l'objectif! ( ({successed_turns}/{max_successed_turns}) * 100.0 ))...")
+
         # --- IA turn ---
         game_state = play_ai_turn(game_id)
         if not game_state:

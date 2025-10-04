@@ -21,7 +21,7 @@ async def get_games(db: AsyncSession = Depends(get_session)):
 async def create_game(game: models.GameSchema, db: AsyncSession = Depends(get_session)):
     game_obj = models.Game(
         scenario_id=game.scenario_id,
-        turn=game.turn,
+        actual_turn=game.turn,
         active=game.active,
         current_player_id=None,
     )
@@ -132,10 +132,10 @@ async def play_player_turn(
 
     if not option_description:
         raise HTTPException(status_code=400, detail="Invalid option selected")
-    
+
     if option_success_rate is None:
         raise HTTPException(status_code=400, detail="Option success rate not found")
-    
+
     # Calculer le succès de l'option choisie
     success = True
     from random import randint
@@ -172,6 +172,10 @@ async def play_player_turn(
     if current_index is not None:
         next_index = (current_index + 1) % len(players_sorted)
         game.current_player_id = players_sorted[next_index].id
+
+    # On incrémente le tour si c'est un succès
+    if success:
+        game.successed_turns += 1
 
     await crud.update_game(db, game)
 
@@ -222,7 +226,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
     if game.phase == "AI":
         # C'est le tour de l'IA
 
-        if game.turn == 0:
+        if game.actual_turn == 0:
             # Premier tour : l'IA décrit la scène
             scenario = game.scenario
             if not scenario:
@@ -300,7 +304,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             )
 
             await crud.create_history_entry(db, history_entry)
-            game.turn += 1
+            game.actual_turn += 1
             game.phase = models.Phase.PLAYER
             await crud.update_game(db, game)
 
@@ -308,6 +312,25 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             # Ce n'est pas le tour 0
             # On récupère l'historique pour "messages" à envoyer à l'IA
             # On ajoute l'ordre de répondre au format attendu par l'IA (dernier message = ordre)
+
+            progression_percents: float = (
+                float(game.successed_turns) / float(game.max_successed_turns)
+            ) * 100.0
+            progression_msg: str = ""
+
+            # On adapte le message de progression en fonction de progression_percents
+            if progression_percents < 25.0:
+                progression_msg = "Les joueurs sont encore loin de l'objectif !"
+            elif progression_percents < 50.0:
+                progression_msg = "Grâce aux derniers succès, les joueurs se rapprochent de la mi-chemin l'objectif !"
+            elif progression_percents < 75.0:
+                progression_msg = "Grâce aux derniers succès, les joueurs se rapprochent de l'objectif !"
+            elif progression_percents < 90.0:
+                progression_msg = (
+                    "Grâce aux derniers succès, les joueurs atteignent l'objectif !"
+                )
+            else:
+                progression_msg = "Grâce aux derniers succès, les joueurs ont atteint l'objectif et terminent ce scnario !"
 
             history_entries = await crud.get_history_by_game(db, game_id)
             messages = []
@@ -323,9 +346,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
                                 detail="Scenario not found for this game",
                             )
                         content += "\n\nTon rôle est de diriger une aventure interactive avec exploration, énigmes et combats obligatoires. N'évites jamais un conflit ou un combat, au contraire, rends-les épiques et engageants. Sois descriptif dans tes narrations pour immerger les joueurs dans l'univers. Propose toujours des options d'actions variées et intéressantes, en lien avec le contexte et les personnages des joueurs."
-                        content += (
-                            f"\n\nRappel de l'obectif : {game.scenario.objectives}.\n"
-                        )
+                        content += f"\n\nRappel de l'objectif : {game.scenario.objectives}. {progression_msg}\n"
                         content += f"\n\nRéponds en français strictement au format JSON demandé, sans rien ajouter d'autre.\n\nLe schema est le suivant:\n{models.AIResponseValidator.model_json_schema()}"
                         content += "\n\nN'utilise que des doubles quotes \" pour les clés et les valeurs.\n\n"
                         content += f"\n\nVoici un exemple de réponse au format JSON attendu:\n{json_exemple.model_dump()}\n\n"
@@ -343,7 +364,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
             )
 
             print(f"Réponse brute de l'IA : {response}")
-            
+
             # Valide la réponse de l'IA
             raw = response["message"]["content"]
             try:
@@ -387,7 +408,7 @@ async def play_ai_turn(game_id: UUID, db: AsyncSession = Depends(get_session)):
 
             await crud.create_history_entry(db, history_entry)
 
-            game.turn += 1
+            game.actual_turn += 1
             game.phase = models.Phase.PLAYER
 
             # On passe au joueur suivant

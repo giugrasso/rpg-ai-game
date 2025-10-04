@@ -59,7 +59,9 @@ class Phase(str, Enum):
 class Game(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     scenario_id: UUID = Field(foreign_key="scenario.id")
-    turn: int = 0
+    actual_turn: int = 0
+    successed_turns: int = 0
+    max_successed_turns: int = 30
     active: bool = True
     current_player_id: Optional[UUID] = None
     phase: Phase = Field(default=Phase.AI)
@@ -88,6 +90,7 @@ class Player(SQLModel, table=True):
     # Relations
     game: Optional[Game] = Relationship(back_populates="players")
     history_entries: List["History"] = Relationship(back_populates="player")
+
 
 class ChatRole(str, Enum):
     SYSTEM = "system"
@@ -152,6 +155,7 @@ class GameSchema(BaseModel):
     scenario_id: UUID
     turn: int = 0
     active: bool = True
+
 
 class PlayerTurnSchema(BaseModel):
     option_id: int
